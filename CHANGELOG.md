@@ -1,5 +1,9 @@
 # Changelog
 
+## V3.3
+- Accueil mobile : blocs « Par prio » sur deux colonnes (quatre à partir de 1024 px).
+- Énergie et taxe foncière : une cellule au format date dans le tableau ne donne plus un montant absurde. L'API reprend le nombre d'origine, le site ignore tout montant annuel hors de 0 à 100 000 €.
+
 ## V3.2 (anonymisation du dépôt public)
 - Plafonds, cibles par Prio et critères retirés de `config.js` : l'API les lit dans l'onglet « Réglages » du Sheet (`lireReglages_`) et les renvoie avec la clé. Sans onglet, le site masque drapeaux, zones et critères au lieu d'afficher des valeurs par défaut.
 - Prénoms, nom du tableau et noms de villes retirés du code, de la doc, du manifeste et des données fictives.

@@ -458,6 +458,8 @@ function convertirLecture_(type, v) {
   switch (type) {
     case 'nombre': {
       if (typeof v === 'number') return v;
+      // Cellule au format date par erreur (ex. 1740 affiché 05/10/1904) : on reprend le numéro de série du tableur.
+      if (v instanceof Date) return Math.round((v.getTime() - Date.UTC(1899, 11, 30)) / 864e5);
       const n = Number(String(v).replace(/[^\d,.\-]/g, '').replace(',', '.'));
       return String(v).trim() === '' || isNaN(n) ? null : n;
     }

@@ -320,7 +320,7 @@ a{color:inherit}
 .stat span{font-size:12px;color:var(--gris)}
 .bloc-resume,.bloc-prios,.bloc-criteres{padding:24px var(--gouttiere) 0}
 .bloc-resume p{font-size:15px;line-height:1.55;margin-top:8px;color:#34383e}
-.grille-prios{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+.grille-prios{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px}
 .cellule-prio{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:12px 10px 12px;text-align:left;min-height:76px;background:var(--surface);border-radius:14px;box-shadow:var(--ombre-1)}
 .cellule-prio .cp-n{font-size:11px;font-weight:800;color:var(--accent-600);background:var(--accent-100);border-radius:var(--r-pilule);padding:1px 7px}
 .cellule-prio b{font-size:24px;font-weight:800;line-height:1.2;margin-top:4px}
@@ -426,6 +426,7 @@ body.sans-onglets .message{bottom:calc(84px + env(safe-area-inset-bottom, 0px))}
 /* =================== Desktop (≥ 1024 px, référence 1280) =================== */
 @media (min-width:1024px){
   :root{--entete-h:64px}
+  .grille-prios{grid-template-columns:repeat(4,1fr)}
   body{padding-bottom:0}
   body.avec-bandeau{padding-bottom:0}
   .entete-bureau{height:64px;min-height:64px;padding:0 20px 0 0;gap:0;align-items:stretch}

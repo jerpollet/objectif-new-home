@@ -111,13 +111,15 @@
     if (/habitable/.test(e)) return "Habitable en l'état";
     return null;
   }
+  /* Montant annuel plausible : écarte une cellule mal formatée dans le tableau plutôt que d'afficher un nombre absurde. */
+  function annuel(v){ return estNb(v) && v > 0 && v < 1e5 ? v : null; }
   function energieMois(a){
-    var mi = estNb(a.energieMin) ? a.energieMin : null, ma = estNb(a.energieMax) ? a.energieMax : null;
+    var mi = annuel(a.energieMin), ma = annuel(a.energieMax);
     if (mi === null && ma === null) return null;
     var lo = arrondi5((mi !== null ? mi : ma) / 12), hi = arrondi5((ma !== null ? ma : mi) / 12);
     return {lo:Math.min(lo, hi), hi:Math.max(lo, hi)};
   }
-  function taxeMois(a){ return estNb(a.taxeFonciere) ? arrondi5(a.taxeFonciere / 12) : null; }
+  function taxeMois(a){ var t = annuel(a.taxeFonciere); return t !== null ? arrondi5(t / 12) : null; }
   function fourchette(f){ return f.lo === f.hi ? nb(f.lo) + " €" : nb(f.lo) + " à " + nb(f.hi) + " €"; }
   function adequation(a){ return estNb(a.score) ? Math.round(a.score) : null; }
 
