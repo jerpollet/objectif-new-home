@@ -10,6 +10,8 @@
  *    {"cle":"XXX","action":"restaurer","num":5}
  *    {"cle":"XXX","action":"verifierLiens","liens":["https://…","texte collé…"]}
  *    {"cle":"XXX","action":"ajouter","liens":["https://…"]}
+ *  verifierLiens : état par lien (A_TRAITER, DOUBLON, IGNOREE, EN_ATTENTE, DEJA_ANALYSEE, LIEN_SUIVI, INVALIDE).
+ *  ajouter : écrit A_TRAITER et les DEJA_ANALYSEE renvoyables (résultat autre que « Ajoutée… »), en nouvelles lignes.
  *
  * La clé est rangée dans les propriétés du script (definirCle()). Sans clé configurée, tout est refusé.
  * Les colonnes sont repérées par leur en-tête : on peut les déplacer dans le tableau.
@@ -337,6 +339,8 @@ function verifierLiens_(liens, annonces, ajouts) {
     if (vus[k]) { vus[k].nb++; return; }
     const g = { entree: texte.slice(0, 1000), valide: l.valide, nb: 1 };
     if (l.valide) g.cle = l.cle;
+    if (l.suivi) { g.suivi = true; g.hote = l.hote; }
+    if (l.direct) g.direct = l.direct;
     vus[k] = g;
     groupes.push(g);
   });
@@ -344,6 +348,9 @@ function verifierLiens_(liens, annonces, ajouts) {
   return groupes.map(g => {
     const r = { entree: g.entree, nb: g.nb };
     if (!g.valide) { r.etat = 'INVALIDE'; return r; }
+    // Lien de suivi d'un mail d'alerte : la veille ne saurait pas l'ouvrir, inutile de le comparer.
+    if (g.suivi) { r.etat = 'LIEN_SUIVI'; r.hote = g.hote; return r; }
+    if (g.direct) r.direct = g.direct;
     const trouvees = parCle[g.cle] || [];
     const enCorbeille = trouvees.filter(a => a.corbeille)[0];
     const visible = trouvees.filter(a => !a.corbeille && !a.masquee)[0];
@@ -374,6 +381,13 @@ function verifierLiens_(liens, annonces, ajouts) {
   });
 }
 
+/* Un lien déjà analysé peut être renvoyé (veille en échec, lien illisible…), sauf s'il a été ajouté au tableau :
+ * normalement il ressort alors en DOUBLON ; ce test protège le cas d'une ligne Annonces supprimée à la main. */
+function renvoyable_(r) {
+  if (r.etat === 'A_TRAITER') return true;
+  return r.etat === 'DEJA_ANALYSEE' && !/^\s*ajout[ée]e/i.test(String(r.resultat || ''));
+}
+
 function detailAnnonce_(a) {
   const d = { num: a.num };
   if (a.prio !== undefined) d.prio = a.prio;
@@ -386,8 +400,9 @@ function ajouter_(liens) {
   // Refaire la vérification sous verrou : un autre appareil a pu envoyer le même lien entre-temps.
   const ajouts = lireAjouts_();
   const resultats = verifierLiens_(liens, lireAnnonces_(), ajouts);
-  const aTraiter = resultats.filter(r => r.etat === 'A_TRAITER');
-  const ecartes = resultats.filter(r => r.etat !== 'A_TRAITER');
+  // Nouvelle ligne Ajouts pour un renvoi : l'ancienne ligne traitée reste telle quelle (historique).
+  const aTraiter = resultats.filter(renvoyable_);
+  const ecartes = resultats.filter(r => !renvoyable_(r));
   if (aTraiter.length) {
     const f = onglet_(ONGLET_AJOUTS);
     const idx = ajouts.idx;
@@ -396,7 +411,7 @@ function ajouter_(liens) {
     const maintenant = horodatage_();
     const lignes = aTraiter.map(r => {
       const l = new Array(largeur).fill('');
-      l[idx.lien] = texteSur_(r.entree, 1000);
+      l[idx.lien] = texteSur_(r.direct || r.entree, 1000);
       l[idx.ajouteLe] = maintenant;
       return l;
     });
@@ -424,11 +439,30 @@ const SITES = [
   [/(^|\.)lesclefsdechezmoi\.fr$/, /-(\d{5,})\.html?$/i, 'lesclefsdechezmoi'],
 ];
 
+// Hôtes de redirection (liens de suivi des mails d'alerte, raccourcisseurs) : la veille ne peut pas les ouvrir.
+// À compléter au besoin. Ne jamais y mettre un portail immobilier ou une agence.
+const HOTES_SUIVI = [
+  /^(click|clic|clicks|track|tracking|trk|links|link)\./,
+  /(^|\.)ct\.sendgrid\.net$/,
+  /(^|\.)list-manage\.com$/,       // Mailchimp
+  /(^|\.)mjt\.lu$/,                 // Mailjet
+  /(^|\.)r\.mailjet\.com$/,
+  /(^|\.)sendib[mt]\d*\.com$/,      // Brevo (ex-Sendinblue) : sendibt2, sendibt3, sendibm1…
+  /(^|\.)hubspotlinks\.com$/,
+  /^(bit\.ly|tinyurl\.com|t\.co|goo\.gl|ow\.ly|lnkd\.in)$/,
+];
+
+// Paramètres qui portent parfois l'adresse finale (Google /url?q=, certains routeurs de mails).
+const PARAMS_CIBLE = ['url', 'u', 'q', 'target', 'redirect', 'redirect_url', 'dest'];
+
 /**
  * Clé de comparaison d'un lien. Seules les URL http(s) valides sont acceptées.
- * Les liens de suivi (click.by.seloger.com…) ne sont pas résolus : ils sont comparés tels quels.
+ * 1. Un lien qui porte l'adresse finale dans un paramètre (url, q…) est remplacé par celle-ci (une seule passe) :
+ *    le résultat a alors `direct`, l'adresse à envoyer à la veille.
+ * 2. Une annonce reconnue d'un portail connu est identifiée par son numéro.
+ * 3. Un hôte de redirection connu donne { suivi: true } : à ouvrir dans le navigateur pour récupérer l'adresse réelle.
  */
-function analyserLien_(brut) {
+function analyserLien_(brut, deroule) {
   const s = String(brut === null || brut === undefined ? '' : brut).trim();
   const m = s.match(/^https?:\/\/([^\/?#\s]+)([^?#\s]*)(\?[^#\s]*)?(#\S*)?$/i);
   if (!m) return { valide: false };
@@ -437,11 +471,19 @@ function analyserLien_(brut) {
   if (!/^([a-z0-9-]+\.)+[a-z]{2,}(:\d+)?$/.test(hote)) return { valide: false };
   hote = hote.replace(/^www\./, '');
   const chemin = (m[2] || '').replace(/\/+$/, '');
+  if (!deroule) {
+    const cible = cibleRedirection_(m[3], hote);
+    if (cible) {
+      const r = analyserLien_(cible, true);
+      if (r.valide) { if (!r.suivi) r.direct = cible; return r; }
+    }
+  }
   for (let i = 0; i < SITES.length; i++) {
     if (!SITES[i][0].test(hote)) continue;
     const id = chemin.match(SITES[i][1]);
     if (id) return { valide: true, cle: SITES[i][2] + ':' + id[1].toLowerCase() };
   }
+  if (HOTES_SUIVI.some(re => re.test(hote))) return { valide: true, suivi: true, hote: hote, cle: 'suivi:' + (hote + chemin + (m[3] || '')).toLowerCase() };
   const params = (m[3] || '').slice(1).split('&').filter(p => {
     if (!p) return false;
     let nom = p.split('=')[0];
@@ -449,6 +491,23 @@ function analyserLien_(brut) {
     return !PARAMS_SUIVI.test(nom);
   }).sort();
   return { valide: true, cle: (hote + chemin + (params.length ? '?' + params.join('&') : '')).toLowerCase() };
+}
+
+// Adresse http(s) d'un autre hôte portée par un paramètre de PARAMS_CIBLE, ou null.
+function cibleRedirection_(requete, hote) {
+  const params = (requete || '').slice(1).split('&');
+  for (let i = 0; i < params.length; i++) {
+    const j = params[i].indexOf('=');
+    if (j < 1) continue;
+    let nom = params[i].slice(0, j), val = params[i].slice(j + 1);
+    try { nom = decodeURIComponent(nom).toLowerCase(); val = decodeURIComponent(val.replace(/\+/g, ' ')).trim(); } catch (x) { continue; }
+    if (PARAMS_CIBLE.indexOf(nom) < 0) continue;
+    const m = val.match(/^https?:\/\/([^\/?#\s:@]+)/i);
+    if (!m) continue;
+    const h = m[1].toLowerCase().replace(/^www\./, '');
+    if (h !== hote) return val;
+  }
+  return null;
 }
 
 /* ---------------- Outils ---------------- */
@@ -572,4 +631,14 @@ function testerVerification() {
     'Maison à voir rue Jean-Jaurès',
   ];
   Logger.log(JSON.stringify(verifierLiens_(liens, lireAnnonces_(), lireAjouts_()), null, 2));
+}
+
+/** Test de l'analyse des liens de redirection depuis l'éditeur, sans rien lire ni écrire. */
+function testerRedirections() {
+  [
+    'https://www.seloger.com/annonces/achat/maison/exemple/123456789.htm',
+    'https://click.by.seloger.com/ls/click?upn=exemple',
+    'https://www.google.com/url?q=https%3A%2F%2Fwww.leboncoin.fr%2Fad%2Fventes_immobilieres%2F1234567890&sa=D',
+    'https://bit.ly/exemple',
+  ].forEach(l => Logger.log('%s\n  -> %s', l, JSON.stringify(analyserLien_(l))));
 }

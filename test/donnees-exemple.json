@@ -51,6 +51,20 @@
       "traite": true,
       "traiteLe": "2026-10-06T09:00:00.000Z",
       "resultat": "Écartée : appartement, pas une maison. Annonce lue via l'alerte Leboncoin transférée ; aucune correspondance avec les critères de la Prio 1, et prix hors cible après frais."
+    },
+    {
+      "lien": "https://www.pap.fr/annonces/maison-exemple-r400000002",
+      "ajouteLe": "2026-10-03T08:00:00.000Z",
+      "traite": true,
+      "traiteLe": "2026-10-03T20:00:00.000Z",
+      "resultat": "Lien illisible : page bloquée par le site (fictif)."
+    },
+    {
+      "lien": "https://www.pap.fr/annonces/maison-exemple-r400000003",
+      "ajouteLe": "2026-10-02T08:00:00.000Z",
+      "traite": true,
+      "traiteLe": "2026-10-02T20:00:00.000Z",
+      "resultat": "Ajoutée en n°99 (annonce fictive retirée du tableau à la main)."
     }
   ],
   "annonces": [

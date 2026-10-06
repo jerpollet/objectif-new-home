@@ -167,6 +167,10 @@ a{color:inherit}
 .coeur-boite.actif .ico{color:var(--favori)}
 .coeur-boite.indic{display:grid;place-items:center;width:44px;height:44px}
 .coeur-boite.indic .ico{color:var(--favori)}
+/* Partager : même pastille que le cœur, à sa gauche. */
+.partage-boite{position:absolute;top:6px;right:50px;z-index:1;background:transparent}
+.partage-boite::before{content:"";position:absolute;inset:5px;border-radius:50%;background:rgba(255,255,255,.94);box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.partage-boite .ico{position:relative;width:18px;height:18px;color:var(--encre)}
 .badge-prio{display:inline-flex;align-items:center;background:var(--accent-100);color:var(--accent-600);font-size:11px;font-weight:800;padding:2px 8px;border-radius:var(--r-pilule);line-height:1.4;flex:none}
 .drapeau{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;padding:3px 10px;border-radius:var(--r-pilule);white-space:nowrap}
 .drapeau::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
@@ -243,6 +247,10 @@ a{color:inherit}
 .poignee{width:40px;height:5px;border-radius:3px;background:rgba(255,255,255,.85);box-shadow:0 1px 3px rgba(0,0,0,.25)}
 .feuille-fiche-tete .btn-ico{position:absolute;right:8px;top:8px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.94);box-shadow:0 1px 3px rgba(0,0,0,.2)}
 .feuille-fiche-tete .btn-ico .ico{width:18px;height:18px}
+.feuille-fiche-tete .btn-ico.btn-partage{right:52px}
+.fiche-absente{margin:56px var(--gouttiere) 24px;display:flex;flex-direction:column;align-items:flex-start;gap:12px;font-size:15px}
+.fiche-absente h2{font-size:22px;font-weight:800;letter-spacing:-.02em}
+.avis-cle{background:var(--cible-fond);color:var(--cible-texte);padding:10px 12px;border-radius:var(--r-btn);font-size:14px;font-weight:600}
 .feuille-fiche-defil{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 .fiche-img{height:240px}
 .fiche-img .tags{top:auto;bottom:12px;left:12px}
@@ -386,6 +394,7 @@ a{color:inherit}
 .badge-etat.e-deja_analysee{background:var(--creux);color:var(--gris)}
 .badge-etat.e-en_attente{background:var(--cible-fond);color:var(--cible-texte)}
 .badge-etat.e-ignoree,.badge-etat.e-invalide{background:var(--max-fond);color:var(--max-texte)}
+.badge-etat.e-lien_suivi{background:var(--cible-fond);color:var(--cible-texte)}
 .note{font-size:13px;color:var(--gris);padding:12px 4px}
 .envoi{position:sticky;bottom:0;background:linear-gradient(to top, var(--fond) 70%, rgba(245,245,243,0));padding:16px var(--gouttiere) calc(12px + env(safe-area-inset-bottom, 0px));margin:0 calc(-1 * var(--gouttiere))}
 .confirmation{padding:28px var(--gouttiere);display:flex;flex-direction:column;gap:18px;align-items:flex-start}
@@ -483,6 +492,7 @@ body.sans-onglets .message{bottom:calc(84px + env(safe-area-inset-bottom, 0px))}
 
   .panneau-fiche{border-left:1px solid var(--ligne);position:sticky;top:64px;height:calc(100vh - 64px);display:flex;flex-direction:column;background:var(--surface);box-shadow:-8px 0 24px rgba(16,24,40,.04)}
   .tiroir-fiche .panneau-fiche{height:100%;position:relative;top:0}
+  .panneau-btns{display:flex;align-items:center;gap:2px}
   .panneau-tete{display:flex;align-items:center;justify-content:space-between;padding:0 8px 0 18px;border-bottom:1px solid var(--ligne);font-size:13px;font-weight:600;color:var(--gris);min-height:48px}
   .panneau-defil{flex:1;overflow-y:auto}
   .fiche-img{height:220px}

@@ -1,5 +1,13 @@
 # Changelog
 
+## V3.4 (renvoi des liens analysés, liens de mail, partage)
+- Ajouter : un lien « Déjà analysée » peut être renvoyé à la veille (case non cochée par défaut, détail « Déjà analysée le JJ/MM : … · cocher pour renvoyer »), sauf si son dernier résultat commence par « Ajoutée ». L'API écrit une nouvelle ligne Ajouts sans toucher à l'ancienne ; le lien ressort ensuite « En attente ». La confirmation affiche « Renvoyée ».
+- Liens de redirection des mails d'alerte : nouvel état `LIEN_SUIVI` (badge « Lien de mail », jamais envoyé). Un lien qui porte l'adresse finale dans un paramètre (`url`, `u`, `q`, `target`, `redirect`, `redirect_url`, `dest`, ex. Google `/url?q=`) est analysé sur cette adresse, qui est aussi celle écrite dans Ajouts. Liste des hôtes dans `HOTES_SUIVI` (Code.gs et app.js) ; fonction de test `testerRedirections()`.
+- Partage Android vers le site (Web Share Target, `share_target` du manifeste) : « Partager » → « New Home » ouvre Ajouter avec le texte reçu, adresse nettoyée, vérification lancée si la clé est connue, jamais d'envoi automatique. Sans clé : message sur la page Ajouter, texte gardé.
+- Bouton « Partager » sur les cartes (vue Cartes) et dans la fiche : texte « Annonce n°… · lieu · surface · prix », lien de fiche sans la clé d'accès, lien de l'annonce. Repli presse-papier (« Copié »). Pas de bouton pour une annonce en corbeille. Contrôle en mode test : `onhTests.partage()` dans la console.
+- Fiche ouverte par un lien direct : message clair (annonce introuvable ou masquée, appareil sans clé, tableau injoignable) au lieu d'une redirection silencieuse.
+- Service worker : cache `onh-v3-4` ; une navigation avec paramètres (partage reçu) est rangée sous l'adresse sans paramètres.
+
 ## V3.3
 - Accueil mobile : blocs « Par prio » sur deux colonnes (quatre à partir de 1024 px).
 - Énergie et taxe foncière : une cellule au format date dans le tableau ne donne plus un montant absurde. L'API reprend le nombre d'origine, le site ignore tout montant annuel hors de 0 à 100 000 €.

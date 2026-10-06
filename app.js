@@ -49,7 +49,8 @@
     plus:'<path d="M5 12h14"/><path d="M12 5v14"/>',
     retour:'<path d="m15 18-6-6 6-6"/>',
     fleche:'<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
-    gauche:'<path d="M19 12H5"/><path d="m12 19-7-7 7-7"/>'
+    gauche:'<path d="M19 12H5"/><path d="m12 19-7-7 7-7"/>',
+    partager:'<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/>'
   };
   function ico(nom, plein){
     var s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -290,24 +291,34 @@
         return test.attendre(r);
       });
     },
-    cle:function(u){
+    /* Version simplifiée de analyserLien_ (Code.gs) : même désenveloppement, mêmes hôtes de suivi. */
+    analyser:function(u, deroule){
       var m = String(u || "").trim().match(/^https?:\/\/(?:www\.)?([^\/?#\s]+)([^?#\s]*)(\?[^#\s]*)?/i);
       if (!m) return null;
+      var hote = m[1].toLowerCase(), chemin = m[2].replace(/\/+$/, "");
+      if (!deroule){
+        var cible = cibleRedirection(m[3], hote);
+        if (cible){ var r = test.analyser(cible, true); if (r){ if (!r.suivi) r.direct = cible; return r; } }
+      }
+      if (!/\d{6,}/.test(chemin) && estHoteSuivi(hote)) return {suivi:true, hote:hote, cle:"suivi:" + (hote + chemin + (m[3] || "")).toLowerCase()};
       var q = (m[3] || "").slice(1).split("&").filter(function(p){ return p && !/^(utm_|xtor|gclid|fbclid)/i.test(p); }).sort().join("&");
-      return (m[1] + m[2].replace(/\/+$/, "") + (q ? "?" + q : "")).toLowerCase();
+      return {cle:(hote + chemin + (q ? "?" + q : "")).toLowerCase()};
     },
+    cle:function(u){ var r = test.analyser(u); return r ? r.cle : null; },
     verifier:function(d, liens){
       var vus = {}, res = [];
       liens.forEach(function(l){
         var t = String(l).trim(); if (!t) return;
-        var k = test.cle(t), id = k ? "L" + k : "T" + t;
+        var an = test.analyser(t), k = an ? an.cle : null, id = k ? "L" + k : "T" + t;
         if (vus[id]){ vus[id].nb++; return; }
         var r = {entree:t, nb:1}; vus[id] = r; res.push(r);
         if (!k){ r.etat = "INVALIDE"; return; }
+        if (an.suivi){ r.etat = "LIEN_SUIVI"; r.hote = an.hote; return; }
+        if (an.direct) r.direct = an.direct;
         var a = d.annonces.filter(function(x){ return test.cle(x.lien) === k; });
         var corb = a.filter(function(x){ return x.corbeille; })[0], autre = a.filter(function(x){ return !x.corbeille; })[0];
         var att = (d.ajouts || []).filter(function(x){ return !x.traite && test.cle(x.lien) === k; })[0];
-        var vu = (d.ajouts || []).filter(function(x){ return x.traite && test.cle(x.lien) === k; })[0];
+        var vu = (d.ajouts || []).filter(function(x){ return x.traite && test.cle(x.lien) === k; }).sort(function(x, y){ return txt(y.traiteLe).localeCompare(txt(x.traiteLe)); })[0];
         if (corb){ r.etat = "IGNOREE"; r.num = corb.num; r.prio = corb.prio; r.quartier = corb.quartier; r.commune = corb.commune; r.corbeilleLe = corb.corbeilleLe; }
         else if (autre){ r.etat = "DOUBLON"; r.num = autre.num; r.prio = autre.prio; r.quartier = autre.quartier; r.commune = autre.commune; if (autre.masquee){ r.masquee = true; r.raisonMasquee = autre.raisonMasquee; } }
         else if (att){ r.etat = "EN_ATTENTE"; r.envoyeLe = att.ajouteLe; }
@@ -321,10 +332,10 @@
         if (test.echouer(true)) return test.attendre().then(function(){ throw erreur("Échec simulé."); });
         if (c.action === "verifierLiens") return test.attendre({ok:true, resultats:test.verifier(d, c.liens)});
         if (c.action === "ajouter"){
-          var res = test.verifier(d, c.liens), ok = res.filter(function(r){ return r.etat === "A_TRAITER"; });
+          var res = test.verifier(d, c.liens), ok = res.filter(renvoyable);
           d.ajouts = d.ajouts || [];
-          ok.forEach(function(r){ d.ajouts.push({lien:r.entree, ajouteLe:new Date().toISOString()}); });
-          return test.attendre({ok:true, ajoutes:ok.map(function(r){ return r.entree; }), ecartes:res.filter(function(r){ return r.etat !== "A_TRAITER"; })});
+          ok.forEach(function(r){ d.ajouts.push({lien:r.direct || r.entree, ajouteLe:new Date().toISOString()}); });
+          return test.attendre({ok:true, ajoutes:ok.map(function(r){ return r.entree; }), ecartes:res.filter(function(r){ return !renvoyable(r); })});
         }
         var a = null;
         d.annonces.forEach(function(x){ if (x.num === c.num && !x.masquee) a = x; });
@@ -552,6 +563,7 @@
     }
     if (o.tags !== false){ var t = tags(a); if (t) box.appendChild(t); }
     if (o.coeur) box.appendChild(coeur(a, "coeur-boite"));
+    if (o.partage){ var bp = boutonPartager(a, "coeur partage-boite"); if (bp) box.appendChild(bp); }
     if (o.coeurIndic && a.favori) box.appendChild(el("span", {classe:"coeur-boite indic", "aria-label":"Favori"}, [ico("heart", true)]));
     return box;
   }
@@ -559,6 +571,42 @@
     return el("button", {type:"button", classe:"coeur" + (classe ? " " + classe : "") + (a.favori ? " actif" : ""), "aria-pressed":a.favori ? "true" : "false",
       "aria-label":(a.favori ? "Retirer des favoris" : "Ajouter aux favoris") + ", annonce n°" + a.num, disabled:a.corbeille,
       onclick:function(e){ e.stopPropagation(); basculerFavori(a); }}, [ico("heart", a.favori)]);
+  }
+  /* ---------- Partager une annonce ---------- */
+  /* Lien de fiche SANS la clé d'accès : le message part dans WhatsApp ou un SMS. Ne pas utiliser hashPour(). */
+  function lienFiche(num){ return location.origin + location.pathname + "#fiche/" + num; }
+  function textePartage(a){
+    var l1 = ["Annonce n°" + a.num];
+    var lieuP = txt(a.quartier) || txt(a.commune);
+    if (lieuP) l1.push(lieuP);
+    if (estNb(a.surface)) l1.push(nb(a.surface) + " m²");
+    if (estNb(a.prix)) l1.push(euros(a.prix));
+    var lignes = [l1.join(" · "), "Fiche : " + lienFiche(a.num)];
+    var url = lienSur(a.lien);
+    if (url) lignes.push("Annonce : " + url);
+    return lignes.join("\n");
+  }
+  /* Garde-fou : un texte qui contiendrait le paramètre de clé (#cle=, &cle=, ?cle=) n'est jamais partagé.
+     Le préfixe évite de bloquer une annonce dont l'adresse contient « article= » ou « vehicle= ». */
+  function partageSur(t){ return !/[#&?]cle=/i.test(t); }
+  function copierTexte(t){
+    if (!navigator.clipboard || !navigator.clipboard.writeText) return Promise.reject(new Error("presse-papier indisponible"));
+    return navigator.clipboard.writeText(t);
+  }
+  function partager(a){
+    var t = textePartage(a);
+    if (!partageSur(t)){ message("Partage annulé : le lien contiendrait la clé d'accès.", "erreur"); return; }
+    function repli(){
+      copierTexte(t).then(function(){ message("Copié"); }, function(){ message("Copie impossible : partagez le lien de l'annonce à la main.", "erreur"); });
+    }
+    if (navigator.share){
+      navigator.share({title:"Annonce n°" + a.num, text:t}).catch(function(e){ if (!(e && e.name === "AbortError")) repli(); });
+    } else repli();
+  }
+  function boutonPartager(a, classe){
+    if (a.corbeille) return null;
+    return el("button", {type:"button", classe:classe, "aria-label":"Partager l'annonce n°" + a.num,
+      onclick:function(e){ e.stopPropagation(); partager(a); }}, [ico("partager")]);
   }
   function badgePrio(a){ return el("span", {classe:"badge-prio", texte:a.prio ? "P" + a.prio : "P?"}); }
   function caseComparer(a){
@@ -610,7 +658,7 @@
         : el("div", {classe:"carte-bas"}, [evaluation(a), caseComparer(a)])
     ]);
     var art = el("article", {classe:"carte" + (choisie ? " choisie" : "") + (suivi ? " carte-suivi" : ""), "aria-label":lieu(a) + ", " + (estNb(a.prix) ? euros(a.prix) : "prix non précisé")}, [
-      el("div", {classe:"carte-haut"}, [image(a, {coeur:true}), corps])
+      el("div", {classe:"carte-haut"}, [image(a, {coeur:true, partage:true}), corps])
     ]);
     if (suivi){
       art.appendChild(el("div", {classe:"carte-actions"}, [
@@ -832,15 +880,35 @@
       lienAnnonce(a, "act-cta", [el("span", {texte:S.bureau ? "Voir l'annonce" : "Annonce"}), ico("externe")])
     ]);
   }
+  /* Fiche sans annonce : lien partagé vers une annonce supprimée ou masquée, appareil sans clé, ou chargement. */
+  function ficheAbsente(){
+    if (!MODE_TEST && !S.cle) return el("div", {classe:"fiche-absente"}, [
+      el("h2", {texte:"Lien privé nécessaire"}),
+      el("p", {texte:"Ouvrez une première fois le site avec votre lien privé reçu par mail, puis rouvrez cette fiche."})]);
+    if (!D && S.echec) return el("div", {classe:"fiche-absente"}, [
+      el("h2", {texte:"Tableau injoignable"}),
+      el("p", {classe:"gris", texte:"Raison : " + (S.erreurTexte || "inconnue")}),
+      el("button", {type:"button", classe:"btn btn-accent", onclick:function(){ charger(true); }}, ["Réessayer"])
+    ]);
+    if (!D || (S.chargement && !trouver(S.route.num))) return el("p", {classe:"vide", texte:"Chargement…"});
+    return el("div", {classe:"fiche-absente"}, [
+      el("h2", {texte:"Annonce introuvable"}),
+      el("p", {texte:"L'annonce n°" + S.route.num + " n'est plus dans le tableau ou a été masquée par la veille."}),
+      el("button", {type:"button", classe:"btn btn-accent", onclick:function(){ S.fond = {nom:"accueil"}; aller({nom:"accueil"}, true); }}, ["Retour à l'accueil"])
+    ]);
+  }
   function panneauFiche(){
     var a = trouver(S.route.num);
     var liste = listeDuFond(), i = a && liste ? liste.indexOf(a) : -1;
     return el("aside", {classe:"panneau-fiche", "aria-label":"Fiche de l'annonce"}, [
       el("div", {classe:"panneau-tete"}, [
         el("span", {texte:"Fiche" + (i >= 0 ? " · " + (i + 1) + " / " + liste.length : a ? " · n°" + a.num : "")}),
-        el("button", {type:"button", classe:"btn-ico", "aria-label":"Fermer la fiche", onclick:fermerFiche}, [ico("x")])
+        el("div", {classe:"panneau-btns"}, [
+          a ? boutonPartager(a, "btn-ico") : null,
+          el("button", {type:"button", classe:"btn-ico", "aria-label":"Fermer la fiche", onclick:fermerFiche}, [ico("x")])
+        ])
       ]),
-      el("div", {classe:"panneau-defil", "data-garde":"fiche-" + S.route.num}, [a ? contenuFiche(a) : el("p", {classe:"vide", texte:D ? "Annonce introuvable." : "Chargement…"})]),
+      el("div", {classe:"panneau-defil", "data-garde":"fiche-" + S.route.num}, [a ? contenuFiche(a) : ficheAbsente()]),
       a ? actionsFiche(a) : null
     ]);
   }
@@ -848,11 +916,12 @@
     var a = trouver(S.route.num);
     var tete = el("div", {classe:"feuille-fiche-tete"}, [
       el("span", {classe:"poignee", "aria-hidden":"true"}),
+      a ? boutonPartager(a, "btn-ico btn-partage") : null,
       el("button", {type:"button", classe:"btn-ico", "aria-label":"Fermer la fiche", onclick:fermerFiche}, [ico("x")])
     ]);
     var feuille = el("div", {classe:"feuille-fiche", role:"dialog", "aria-modal":"true", "aria-label":a ? "Annonce n°" + a.num : "Annonce"}, [
       tete,
-      el("div", {classe:"feuille-fiche-defil", "data-garde":"fiche-" + S.route.num}, [a ? contenuFiche(a) : el("p", {classe:"vide", texte:D ? "Annonce introuvable." : "Chargement…"})]),
+      el("div", {classe:"feuille-fiche-defil", "data-garde":"fiche-" + S.route.num}, [a ? contenuFiche(a) : ficheAbsente()]),
       a ? actionsFiche(a) : null
     ]);
     glisserPourFermer(tete, feuille);
@@ -1076,10 +1145,35 @@
       return seg ? hote + " · " + tronquer(seg, 26) : hote;
     } catch(e){ return tronquer(u, 40); }
   }
+  /* Hôtes de redirection des mails d'alerte et raccourcisseurs : même liste que HOTES_SUIVI (Code.gs). */
+  var HOTES_SUIVI = [
+    /^(click|clic|clicks|track|tracking|trk|links|link)\./, /(^|\.)ct\.sendgrid\.net$/, /(^|\.)list-manage\.com$/, /(^|\.)mjt\.lu$/,
+    /(^|\.)r\.mailjet\.com$/, /(^|\.)sendib[mt]\d*\.com$/, /(^|\.)hubspotlinks\.com$/, /^(bit\.ly|tinyurl\.com|t\.co|goo\.gl|ow\.ly|lnkd\.in)$/
+  ];
+  function estHoteSuivi(h){ return HOTES_SUIVI.some(function(re){ return re.test(h); }); }
+  var PARAMS_CIBLE = ["url", "u", "q", "target", "redirect", "redirect_url", "dest"];
+  function cibleRedirection(requete, hote){
+    var p = (requete || "").slice(1).split("&");
+    for (var i = 0; i < p.length; i++){
+      var j = p[i].indexOf("="); if (j < 1) continue;
+      var nom, val;
+      try { nom = decodeURIComponent(p[i].slice(0, j)).toLowerCase(); val = decodeURIComponent(p[i].slice(j + 1).replace(/\+/g, " ")).trim(); } catch(e){ continue; }
+      if (PARAMS_CIBLE.indexOf(nom) < 0) continue;
+      var m = val.match(/^https?:\/\/([^\/?#\s:@]+)/i);
+      if (m && m[1].toLowerCase().replace(/^www\./, "") !== hote.replace(/^www\./, "")) return val;
+    }
+    return null;
+  }
   function hoteDe(u){ try { return new URL(u).hostname.replace(/^www\./, ""); } catch(e){ return ""; } }
   var ETATS = {
-    A_TRAITER:{badge:"À traiter"}, DOUBLON:{badge:"Doublon"}, IGNOREE:{badge:"Ignorée"}, EN_ATTENTE:{badge:"En attente"}, DEJA_ANALYSEE:{badge:"Déjà analysée"}, INVALIDE:{badge:"Invalide"}
+    A_TRAITER:{badge:"À traiter"}, DOUBLON:{badge:"Doublon"}, IGNOREE:{badge:"Ignorée"}, EN_ATTENTE:{badge:"En attente"}, DEJA_ANALYSEE:{badge:"Déjà analysée"},
+    LIEN_SUIVI:{badge:"Lien de mail"}, INVALIDE:{badge:"Invalide"}
   };
+  /* Envoyable à la veille : nouveau lien, ou lien déjà analysé à renvoyer (sauf s'il a été ajouté au tableau). Même règle que renvoyable_ (Code.gs). */
+  function renvoyable(r){
+    if (r.etat === "A_TRAITER") return true;
+    return r.etat === "DEJA_ANALYSEE" && !/^\s*ajout[ée]e/i.test(txt(r.resultat));
+  }
   /* complet : texte entier du Résultat (affiché au survol ou au toucher). */
   function detailVerif(r, complet){
     var lieuR = txt(r.quartier) || txt(r.commune) || "quartier inconnu";
@@ -1089,8 +1183,10 @@
     else if (r.etat === "DOUBLON") d = "Déjà en base · n°" + r.num + " · P" + (r.prio || "?") + ", " + lieuR;
     else if (r.etat === "DEJA_ANALYSEE"){
       var res = txt(r.resultat);
-      d = "Déjà analysée" + (r.traiteLe ? " le " + dateCourte(r.traiteLe) : "") + (res ? " : " + (complet ? res : tronquer(res, 80)) : "");
+      d = "Déjà analysée" + (r.traiteLe ? " le " + fmtDate(r.traiteLe, {day:"2-digit", month:"2-digit"}) : "") + (res ? " : " + (complet ? res : tronquer(res, 80)) : "");
+      if (renvoyable(r)) d += " · cocher pour renvoyer";
     }
+    else if (r.etat === "LIEN_SUIVI") d = "Lien de suivi d'un mail : ouvrez l'annonce et copiez l'adresse de sa page";
     else if (r.etat === "IGNOREE") d = "Dans la corbeille depuis le " + (dateCourte(r.corbeilleLe) || "?");
     else if (r.etat === "EN_ATTENTE") d = "Déjà envoyée" + (r.envoyeLe ? " le " + dateCourte(r.envoyeLe) : "") + ", pas encore analysée";
     else d = "Ce n'est pas un lien d'annonce";
@@ -1098,15 +1194,17 @@
   }
   function titreVerif(r){
     if (r.etat === "INVALIDE") return "« " + tronquer(r.entree, 40) + " »";
-    if (r.etat === "A_TRAITER" || r.etat === "EN_ATTENTE" || r.etat === "DEJA_ANALYSEE") return libelleAdresse(r.entree);
+    if (r.etat === "LIEN_SUIVI") return txt(r.hote) || hoteDe(r.entree);
+    if (r.etat === "A_TRAITER" || r.etat === "EN_ATTENTE" || r.etat === "DEJA_ANALYSEE") return libelleAdresse(r.direct || r.entree);
     return hoteDe(r.entree) + " · " + (txt(r.quartier) || txt(r.commune) || "n°" + r.num || "");
   }
   function verifier(){
     var A = S.ajout, entrees = extraireEntrees(A.texte);
-    if (!entrees.length || A.verif) return;
+    if (!entrees.length || A.verif || (!MODE_TEST && !S.cle)) return;
     A.verif = true; rendre();
     ecrire({action:"verifierLiens", liens:entrees}).then(function(r){
       A.resultats = r.resultats || []; A.coches = {};
+      /* Seuls les nouveaux liens sont pré-cochés ; un renvoi se coche à la main. */
       A.resultats.forEach(function(x, i){ if (x.etat === "A_TRAITER") A.coches[i] = true; });
     }, function(e){
       if (e.cle){ cleInvalide(); return; }
@@ -1115,11 +1213,14 @@
   }
   function envoyerAjouts(){
     var A = S.ajout;
-    var liens = (A.resultats || []).filter(function(r, i){ return r.etat === "A_TRAITER" && A.coches[i]; }).map(function(r){ return r.entree; });
+    var choisis = (A.resultats || []).filter(function(r, i){ return renvoyable(r) && A.coches[i]; });
+    var liens = choisis.map(function(r){ return r.entree; });
     if (!liens.length || A.envoi) return;
+    var renvois = {}, directs = {};
+    choisis.forEach(function(r){ if (r.etat === "DEJA_ANALYSEE") renvois[r.entree] = true; if (r.direct) directs[r.entree] = r.direct; });
     A.envoi = true; rendre();
     ecrire({action:"ajouter", liens:liens}).then(function(r){
-      A.fait = {ajoutes:r.ajoutes || [], ecartes:r.ecartes || []};
+      A.fait = {ajoutes:r.ajoutes || [], ecartes:r.ecartes || [], renvois:renvois, directs:directs};
       A.texte = ""; A.resultats = null; A.coches = {};
     }, function(e){
       if (e.cle){ cleInvalide(); return; }
@@ -1128,7 +1229,7 @@
   }
   function nbCoches(){
     var A = S.ajout;
-    return (A.resultats || []).filter(function(r, i){ return r.etat === "A_TRAITER" && A.coches[i]; }).length;
+    return (A.resultats || []).filter(function(r, i){ return renvoyable(r) && A.coches[i]; }).length;
   }
   function blocSaisie(){
     var A = S.ajout;
@@ -1136,9 +1237,10 @@
       autocapitalize:"off", autocomplete:"off", spellcheck:"false", "aria-label":"Liens d'annonces"});
     zone.value = A.texte;
     var btnVerif = el("button", {type:"button", classe:"btn btn-encre btn-large", onclick:verifier}, []);
+    var sansCle = !MODE_TEST && !S.cle;
     function majBouton(){
       var n = extraireEntrees(zone.value).length;
-      btnVerif.disabled = !n || A.verif;
+      btnVerif.disabled = !n || A.verif || sansCle;
       btnVerif.textContent = "";
       btnVerif.appendChild(el("span", {texte:A.verif ? "Vérification…" : "Vérifier " + pluriel(n, "lien")}));
       btnVerif.appendChild(ico("fleche"));
@@ -1158,6 +1260,7 @@
     }}, ["Coller"]) : null;
     return el("div", {classe:"saisie"}, [
       S.bureau ? el("h1", {texte:"Ajouter des annonces"}) : null,
+      sansCle ? el("p", {classe:"avis-cle", role:"alert", texte:"Ouvrez une première fois le site avec votre lien privé, puis partagez à nouveau."}) : null,
       S.bureau ? el("p", {classe:"gris", texte:"Collez un ou plusieurs liens, un par ligne ou en vrac."}) : el("label", {classe:"lib-champ", "for":"saisie-liens", texte:"Liens d'annonces"}),
       zone,
       el("div", {classe:"saisie-btns" + (coller ? "" : " seul")}, [coller, btnVerif])
@@ -1171,7 +1274,7 @@
       return box;
     }
     box.appendChild(el("ul", {classe:"resultats"}, A.resultats.map(function(r, i){
-      var actif = r.etat === "A_TRAITER";
+      var actif = renvoyable(r);
       var coche = actif && !!A.coches[i];
       return el("li", {classe:"resultat" + (actif ? "" : " estompe") + (r.etat === "INVALIDE" ? " invalide" : "")}, [
         el("label", {classe:"res-case"}, [
@@ -1196,11 +1299,11 @@
   }
   function blocConfirmation(){
     var A = S.ajout, f = A.fait, n = f.ajoutes.length;
-    var etats = {DOUBLON:"Déjà en base", IGNOREE:"Dans la corbeille", EN_ATTENTE:"Déjà en attente", DEJA_ANALYSEE:"Déjà analysée", INVALIDE:"Invalide"};
+    var etats = {DOUBLON:"Déjà en base", IGNOREE:"Dans la corbeille", EN_ATTENTE:"Déjà en attente", DEJA_ANALYSEE:"Déjà analysée", LIEN_SUIVI:"Lien de mail", INVALIDE:"Invalide"};
     return el("div", {classe:"confirmation"}, [
       el("span", {classe:"grand-check", "aria-hidden":"true"}, [ico("check")]),
       el("h2", {texte:n ? pluriel(n, "annonce envoyée", "annonces envoyées") + " à la veille." : "Aucune annonce envoyée."}),
-      el("ul", {classe:"envoyes"}, f.ajoutes.map(function(u){ return el("li", null, [el("b", {texte:libelleAdresse(u)}), el("span", {texte:"Envoyée"})]); })
+      el("ul", {classe:"envoyes"}, f.ajoutes.map(function(u){ return el("li", null, [el("b", {texte:libelleAdresse(f.directs[u] || u)}), el("span", {texte:f.renvois[u] ? "Renvoyée" : "Envoyée"})]); })
         .concat(f.ecartes.map(function(r){ return el("li", {classe:"estompe"}, [el("b", {texte:titreVerif(r)}), el("span", {texte:"Écartée : " + (etats[r.etat] || r.etat).toLowerCase()})]); }))),
       el("button", {type:"button", classe:"btn btn-contour btn-large", onclick:function(){ A.fait = null; rendre(); var z = $("saisie-liens"); if (z) z.focus(); }}, [el("span", {texte:"Ajouter d'autres liens"}), ico("plus")])
     ]);
@@ -1374,6 +1477,8 @@
     ]);
   }
   function contenuPage(){
+    /* Partage reçu sur un appareil sans clé : la page Ajouter garde le texte et explique quoi faire. */
+    if (!MODE_TEST && !S.cle && S.route.nom === "ajouter" && S.ajout.texte) return vueAjouter();
     if (!MODE_TEST && !S.cle) return ecranCle();
     if (!D && S.echec) return ecranEchec();
     var r = pageActive();
@@ -1428,10 +1533,35 @@
     rendreCouches();
     rendreDefilements(g);
     window.scrollTo(0, y);
-    if (S.route.nom === "fiche" && D && !trouver(S.route.num) && !S.chargement){
-      message("Annonce introuvable.", "erreur");
-      aller(S.fond, true);
-    }
+  }
+
+  /* ---------- Partage reçu d'une autre appli (Web Share Target, voir manifest.webmanifest) ---------- */
+  var PARAMS_PARTAGE = ["partage_titre", "partage_texte", "partage_lien"];
+  /* Lit ?partage_titre=…&partage_texte=…&partage_lien=…, nettoie l'adresse et prépare la page Ajouter.
+     Les applis mettent souvent le lien dans le texte, parfois aussi dans url : extraireEntrees dédoublonne. */
+  function lirePartage(){
+    var q = (location.search || "").replace(/^\?/, ""), morceaux = [], reste = [], vu = false;
+    q.split("&").forEach(function(p){
+      if (!p) return;
+      var i = p.indexOf("="), k = i < 0 ? p : p.slice(0, i), v = i < 0 ? "" : p.slice(i + 1);
+      try { k = decodeURIComponent(k); } catch(e){}
+      if (PARAMS_PARTAGE.indexOf(k) < 0){ reste.push(p); return; }
+      vu = true;
+      try { v = decodeURIComponent(v.replace(/\+/g, " ")); } catch(e){ v = ""; }
+      v = v.trim();
+      if (v) morceaux.push(v);
+    });
+    if (!vu) return null;
+    /* 1. Adresse nettoyée tout de suite : un rechargement ne rejoue pas le partage.
+          Les autres paramètres (test=1 en mode test) sont gardés. */
+    var adr = lireAdresse();
+    try { history.replaceState(null, "", location.pathname + (reste.length ? "?" + reste.join("&") : "") + "#ajouter" + (adr.cle ? "&cle=" + encodeURIComponent(adr.cle) : "")); } catch(e){}
+    /* 2. Texte ajouté à la suite d'une saisie éventuelle. */
+    var t = morceaux.join("\n");
+    if (!t) return null;
+    S.ajout.texte = (S.ajout.texte.trim() ? S.ajout.texte.replace(/\s+$/, "") + "\n" : "") + t;
+    S.ajout.resultats = null; S.ajout.coches = {}; S.ajout.fait = null;
+    return t;
   }
 
   /* ---------- Démarrage ---------- */
@@ -1453,11 +1583,24 @@
     }
   }
   if (MODE_TEST) document.body.appendChild(el("div", {classe:"badge-test", texte:"Données de test"}));
+  var partage = lirePartage();
   var cache = (MODE_TEST || S.cle) ? lireCache() : null;
   if (cache) appliquer(cache);
   window.addEventListener("hashchange", surRoute);
   surRoute();
   charger(true);
+  /* Jamais d'envoi automatique : la vérification seulement, l'envoi reste un appui sur le bouton. */
+  if (partage && (MODE_TEST || S.cle)) verifier();
+  /* Mode test : contrôles lançables depuis la console. onhTests.partage() vérifie qu'aucun texte partagé ne contient la clé. */
+  if (MODE_TEST) window.onhTests = {
+    partage:function(){
+      var fautifs = annonces().filter(function(a){ return !partageSur(textePartage(a)); }).map(function(a){ return a.num; });
+      var r = {ok:!fautifs.length && !!annonces().length, annonces:annonces().length, fautifs:fautifs, exemple:annonces()[0] ? textePartage(annonces()[0]) : null};
+      if (window.console) console.log("onhTests.partage", r.ok ? "OK" : "ÉCHEC", r);
+      return r;
+    },
+    texte:function(num){ var a = trouver(num); return a ? textePartage(a) : null; }
+  };
 
   /* Plusieurs personnes modifient le même tableau : relire au retour au premier plan, au plus toutes les 30 s. */
   document.addEventListener("visibilitychange", function(){ if (document.visibilityState === "visible") charger(false); });
