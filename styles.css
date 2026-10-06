@@ -103,6 +103,10 @@ a{color:inherit}
 
 /* ---------- Barre d'outils ---------- */
 .outils{display:flex;align-items:center;gap:6px;padding:12px var(--gouttiere) 4px;overflow-x:auto;scrollbar-width:none}
+.rappel-prio{display:flex;align-items:center;gap:10px;margin:12px var(--gouttiere) 0;padding:10px 12px;background:var(--surface);border-radius:14px;box-shadow:var(--ombre-1)}
+.rp-txt{display:flex;flex-direction:column;gap:1px;min-width:0;font-size:13px;line-height:1.35}
+.rp-txt b{font-size:14px;font-weight:700}
+.rp-txt span{color:var(--gris)}
 .outils::-webkit-scrollbar{display:none}
 .puce{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:0 11px;flex:none;border:1px solid var(--ligne-forte);background:var(--surface);border-radius:var(--r-pilule);font-size:13px;font-weight:600;white-space:nowrap;position:relative}
 .puce::after{content:"";position:absolute;inset:-3px 0}
@@ -241,11 +245,10 @@ a{color:inherit}
 
 /* ---------- Fiche (2b) ---------- */
 .couche-fiche{z-index:50}
-.feuille-fiche{position:absolute;left:0;right:0;bottom:0;top:44px;display:flex;flex-direction:column;background:var(--surface);border-radius:20px 20px 0 0;overflow:hidden;box-shadow:var(--ombre-3);transition:transform .2s ease;animation:monte .25s cubic-bezier(.2,.8,.2,1)}
-.feuille-fiche-tete{position:absolute;top:0;left:0;right:0;z-index:3;display:flex;align-items:center;justify-content:center;padding:6px;touch-action:none;min-height:48px;pointer-events:none}
+.feuille-fiche{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--surface);overflow:hidden;animation:monte .25s cubic-bezier(.2,.8,.2,1)}
+.feuille-fiche-tete{position:absolute;top:0;left:0;right:0;z-index:3;display:flex;align-items:center;justify-content:center;padding:6px;min-height:48px;pointer-events:none}
 .feuille-fiche-tete > *{pointer-events:auto}
-.poignee{width:40px;height:5px;border-radius:3px;background:rgba(255,255,255,.85);box-shadow:0 1px 3px rgba(0,0,0,.25)}
-.feuille-fiche-tete .btn-ico{position:absolute;right:8px;top:8px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.94);box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.feuille-fiche-tete .btn-ico{position:absolute;right:8px;top:calc(8px + env(safe-area-inset-top, 0px));width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.94);box-shadow:0 1px 3px rgba(0,0,0,.2)}
 .feuille-fiche-tete .btn-ico .ico{width:18px;height:18px}
 .feuille-fiche-tete .btn-ico.btn-partage{right:52px}
 .fiche-absente{margin:56px var(--gouttiere) 24px;display:flex;flex-direction:column;align-items:flex-start;gap:12px;font-size:15px}
@@ -459,6 +462,7 @@ body.sans-onglets .message{bottom:calc(84px + env(safe-area-inset-bottom, 0px))}
   .onglets-prio,.bandeau-comparer{display:none}
 
   .outils{padding:18px 28px 6px;gap:8px}
+  .rappel-prio{margin:18px 28px 0}
   .outils-nb{font-weight:800;font-size:16px;margin-right:8px;white-space:nowrap;letter-spacing:-.01em}
   .puce{min-height:38px}
   .segmente button{min-height:32px;padding:0 14px;font-size:13px}

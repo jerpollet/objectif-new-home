@@ -1,5 +1,9 @@
 # Changelog
 
+## V3.4.1
+- Fiche mobile en plein écran ; Partager et Fermer restent en haut pendant le défilement. Le geste « glisser vers le bas » (qui ne répondait que sur la petite poignée) est supprimé.
+- Listes Prio : carte de rappel en tête (zone et cible frais compris, tirées de l'onglet Réglages), au-dessus de la barre de tri.
+
 ## V3.4 (renvoi des liens analysés, liens de mail, partage)
 - Ajouter : un lien « Déjà analysée » peut être renvoyé à la veille (case non cochée par défaut, détail « Déjà analysée le JJ/MM : … · cocher pour renvoyer »), sauf si son dernier résultat commence par « Ajoutée ». L'API écrit une nouvelle ligne Ajouts sans toucher à l'ancienne ; le lien ressort ensuite « En attente ». La confirmation affiche « Renvoyée ».
 - Liens de redirection des mails d'alerte : nouvel état `LIEN_SUIVI` (badge « Lien de mail », jamais envoyé). Un lien qui porte l'adresse finale dans un paramètre (`url`, `u`, `q`, `target`, `redirect`, `redirect_url`, `dest`, ex. Google `/url?q=`) est analysé sur cette adresse, qui est aussi celle écrite dans Ajouts. Liste des hôtes dans `HOTES_SUIVI` (Code.gs et app.js) ; fonction de test `testerRedirections()`.

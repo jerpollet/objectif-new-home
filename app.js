@@ -765,7 +765,7 @@
     var base = type === "prio" ? parPrio(n) : suivis();
     var liste = trier(filtrer(base, type === "prio"), type === "suivi");
     var panneau = S.bureau && S.route.nom === "fiche" ? panneauFiche() : null;
-    var col = el("div", {classe:"col-liste"}, [barreOutils(type, liste.length)]);
+    var col = el("div", {classe:"col-liste"}, [type === "prio" ? rappelPrio(n) : null, barreOutils(type, liste.length)]);
     if (!D) col.appendChild(squelettes(UI.viewMode));
     else if (!liste.length){
       var filtre = UI.favoris || (type === "prio" && UI.nouveau);
@@ -776,6 +776,18 @@
     else col.appendChild(el("div", {classe:"cartes" + (type === "suivi" ? " cartes-suivi" : "")}, liste.map(function(a){ return carte(a, type === "suivi"); })));
     if (S.bureau && type === "prio" && UI.compareIds.length) col.appendChild(bandeauComparer());
     return el("div", {classe:"vue-liste" + (panneau ? " avec-panneau" : "")}, [col, panneau]);
+  }
+  /* Rappel de la Prio en tête de liste : zone et cible (frais compris), venus de l'onglet Réglages. */
+  function rappelPrio(n){
+    var P = PRIOS[n];
+    if (!P || (!txt(P.zone) && !estNb(P.cibleMax))) return null;
+    return el("div", {classe:"rappel-prio"}, [
+      el("span", {classe:"badge-prio", texte:"P" + n}),
+      el("div", {classe:"rp-txt"}, [
+        txt(P.zone) ? el("b", {texte:txt(P.zone)}) : null,
+        estNb(P.cibleMax) ? el("span", {texte:"Cible ≤ " + kEuros(P.cibleMax) + " frais compris"}) : null
+      ])
+    ]);
   }
   function bandeauComparer(){
     var n = UI.compareIds.length;
@@ -912,10 +924,10 @@
       a ? actionsFiche(a) : null
     ]);
   }
+  /* Fiche mobile en plein écran : Partager et Fermer restent en haut pendant le défilement. */
   function feuilleFiche(){
     var a = trouver(S.route.num);
     var tete = el("div", {classe:"feuille-fiche-tete"}, [
-      el("span", {classe:"poignee", "aria-hidden":"true"}),
       a ? boutonPartager(a, "btn-ico btn-partage") : null,
       el("button", {type:"button", classe:"btn-ico", "aria-label":"Fermer la fiche", onclick:fermerFiche}, [ico("x")])
     ]);
@@ -924,24 +936,8 @@
       el("div", {classe:"feuille-fiche-defil", "data-garde":"fiche-" + S.route.num}, [a ? contenuFiche(a) : ficheAbsente()]),
       a ? actionsFiche(a) : null
     ]);
-    glisserPourFermer(tete, feuille);
     return el("div", {classe:"couche couche-fiche"}, [el("div", {classe:"voile", onclick:fermerFiche}), feuille]);
   }
-  function glisserPourFermer(poignee, feuille){
-    var y0 = null, dy = 0;
-    poignee.addEventListener("touchstart", function(e){ y0 = e.touches[0].clientY; dy = 0; feuille.style.transition = "none"; }, {passive:true});
-    poignee.addEventListener("touchmove", function(e){
-      if (y0 === null) return;
-      dy = Math.max(0, e.touches[0].clientY - y0);
-      feuille.style.transform = "translateY(" + dy + "px)";
-    }, {passive:true});
-    poignee.addEventListener("touchend", function(){
-      feuille.style.transition = "";
-      if (dy > 90) fermerFiche(); else feuille.style.transform = "";
-      y0 = null;
-    });
-  }
-
   /* ---------- Accueil ---------- */
   function surtitreVeille(){
     var d = D && D.rapport ? D.rapport.derniereVeille : null;
