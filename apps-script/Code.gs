@@ -1,13 +1,17 @@
 /**
- * Objectif New Home : API du tableau de suivi (V3).
+ * Objectif New Home : API du tableau de suivi (V3.5).
  * Script lié au tableau (SpreadsheetApp.getActive), publié en application web.
  *
- *  GET  <url>?cle=XXX  -> annonces non masquées + rapport + réglages + horodatage (JSON)
+ *  GET  <url>?cle=XXX  -> annonces non masquées (avec leur note) + journal + rapport + réglages + horodatage (JSON)
  *  POST <url> (corps JSON, envoyé en Content-Type text/plain pour éviter la requête préalable CORS) :
- *    {"cle":"XXX","action":"favori","num":5,"valeur":true}
- *    {"cle":"XXX","action":"contact","num":5,"valeur":false}
- *    {"cle":"XXX","action":"corbeille","num":5}
- *    {"cle":"XXX","action":"restaurer","num":5}
+ *    {"cle":"XXX","action":"favori","num":5,"valeur":true,"par":"Prénom"}
+ *    {"cle":"XXX","action":"contact","num":5,"valeur":false,"par":"Prénom"}
+ *    {"cle":"XXX","action":"corbeille","num":5,"raison":"Trop de travaux","par":"Prénom"}
+ *    {"cle":"XXX","action":"restaurer","num":5,"par":"Prénom"}
+ *    {"cle":"XXX","action":"note","num":5,"texte":"…"}            (texte vide : note vidée)
+ *    {"cle":"XXX","action":"journal","num":5,"texte":"…","par":"Prénom"}
+ *  « par » est facultatif. Chaque changement de statut ajoute une ligne à l'onglet Journal (créé au besoin) ;
+ *  le journal ne se modifie pas depuis le site.
  *    {"cle":"XXX","action":"verifierLiens","liens":["https://…","texte collé…"]}
  *    {"cle":"XXX","action":"ajouter","liens":["https://…"]}
  *  verifierLiens : état par lien (A_TRAITER, DOUBLON, IGNOREE, EN_ATTENTE, DEJA_ANALYSEE, LIEN_SUIVI, INVALIDE).
@@ -16,13 +20,18 @@
  * La clé est rangée dans les propriétés du script (definirCle()). Sans clé configurée, tout est refusé.
  * Les colonnes sont repérées par leur en-tête : on peut les déplacer dans le tableau.
  * Le site n'écrit que Favori, En contact, En contact depuis, Corbeille, Corbeille le,
- * Statut changé le et Raison corbeille (vidée à la restauration), et des lignes dans Ajouts.
+ * Statut changé le, Raison corbeille (vidée à la restauration) et Notes, des lignes dans Ajouts et dans Journal.
  */
 
 const ONGLET_ANNONCES = 'Annonces';
 const ONGLET_RAPPORT = 'Rapport';
 const ONGLET_AJOUTS = 'Ajouts';
 const ONGLET_REGLAGES = 'Réglages';
+const ONGLET_JOURNAL = 'Journal';
+const ENTETES_JOURNAL = ['Date', 'N°', 'Par', 'Type', 'Texte'];
+const MAX_NOTE = 2000;
+const MAX_RAISON = 500;
+const MAX_JOURNAL = 1000; // entrées renvoyées au site (les plus récentes)
 const FUSEAU = 'Europe/Paris';
 const FORMAT_DATE = 'dd/MM/yyyy HH:mm';
 const MAX_LIENS = 50;
@@ -70,16 +79,16 @@ const COLONNES = [
   ['taxeFonciere', 'Taxe foncière (€/an)', 'nombre'],
 ];
 
-// Champs renvoyés au site : ni notes, ni masquage, ni identifiant.
+// Champs renvoyés au site (avec la clé) : ni masquage, ni identifiant.
 const CHAMPS_SITE = [
-  'num', 'prio', 'commune', 'quartier', 'prix', 'surface', 'pieces', 'chambres', 'terrain', 'dpe', 'garage',
+  'num', 'notes', 'prio', 'commune', 'quartier', 'prix', 'surface', 'pieces', 'chambres', 'terrain', 'dpe', 'garage',
   'lien', 'lienVerifieLe', 'source', 'repereeLe', 'pepite', 'score', 'atouts', 'vigilance', 'resume', 'titre',
   'photo', 'statutLe', 'raisonCorbeille', 'favori', 'enContact', 'enContactDepuis', 'corbeille', 'corbeilleLe',
   'etat', 'energieMin', 'energieMax', 'taxeFonciere',
 ];
 
 // Les seules colonnes d'Annonces que le site a le droit d'écrire.
-const ECRITES_PAR_LE_SITE = ['favori', 'enContact', 'enContactDepuis', 'corbeille', 'corbeilleLe', 'statutLe', 'raisonCorbeille'];
+const ECRITES_PAR_LE_SITE = ['favori', 'enContact', 'enContactDepuis', 'corbeille', 'corbeilleLe', 'statutLe', 'raisonCorbeille', 'notes'];
 
 const AJOUTS = {
   lien: "Lien de l'annonce", par: 'Ajouté par', commentaire: 'Commentaire', ajouteLe: 'Ajouté le',
@@ -93,7 +102,7 @@ function doGet(e) {
     const p = (e && e.parameter) || {};
     verifierCle_(p.cle);
     const annonces = lireAnnonces_().filter(x => !x.annonce.masquee).map(x => pourSite_(x.annonce));
-    return json_({ ok: true, lu: new Date().toISOString(), rapport: lireRapport_(), reglages: lireReglages_(), annonces: annonces });
+    return json_({ ok: true, lu: new Date().toISOString(), rapport: lireRapport_(), reglages: lireReglages_(), annonces: annonces, journal: lireJournal_() });
   } catch (err) {
     return json_({ ok: false, erreur: String(err.message || err) });
   }
@@ -114,13 +123,15 @@ function doPost(e) {
     if (action === 'verifierLiens') {
       return json_({ ok: true, resultats: verifierLiens_(corps.liens, lireAnnonces_(), lireAjouts_()) });
     }
-    if (['favori', 'contact', 'corbeille', 'restaurer', 'ajouter'].indexOf(action) < 0) {
+    if (['favori', 'contact', 'corbeille', 'restaurer', 'ajouter', 'note', 'journal'].indexOf(action) < 0) {
       throw new Error('Action inconnue : ' + action);
     }
     verrou.waitLock(15000);
     verrouille = true;
     if (action === 'ajouter') return json_(Object.assign({ ok: true }, ajouter_(corps.liens)));
-    return json_({ ok: true, annonce: changerStatut_(action, corps) });
+    if (action === 'note') return json_({ ok: true, annonce: ecrireNote_(corps) });
+    if (action === 'journal') return json_({ ok: true, entree: ajouterAuJournal_(corps) });
+    return json_(Object.assign({ ok: true }, changerStatut_(action, corps)));
   } catch (err) {
     return json_({ ok: false, erreur: String(err.message || err) });
   } finally {
@@ -193,12 +204,13 @@ function lireRapport_() {
 }
 
 /* Onglet Réglages : colonne A le libellé, colonne B la valeur, ligne 1 d'en-tête.
- * Libellés reconnus : « Plafond », « Plafond max », « Prio N cible », « Prio N zone », « Critère » (une ligne par critère).
+ * Libellés reconnus : « Plafond », « Plafond max », « Prio N cible », « Prio N zone », « Critère » (une ligne par critère),
+ * « Personne » (une ligne par prénom : choix « par » du journal sur le site).
  * Ces réglages ne sont jamais dans le dépôt public : le site les reçoit ici, avec la clé. Sans onglet, renvoie null. */
 function lireReglages_() {
   const f = SpreadsheetApp.getActive().getSheetByName(ONGLET_REGLAGES);
   if (!f || f.getLastRow() < 2) return null;
-  const r = { plafond: null, plafondMax: null, prios: {}, criteres: [] };
+  const r = { plafond: null, plafondMax: null, prios: {}, criteres: [], personnes: [] };
   f.getRange(2, 1, f.getLastRow() - 1, 2).getValues().forEach(l => {
     const lib = String(l[0] || '').trim().toLowerCase();
     const v = l[1];
@@ -211,8 +223,54 @@ function lireReglages_() {
       if (m[2] === 'cible') p.cibleMax = convertirLecture_('nombre', v);
       else p.zone = String(v).trim().slice(0, 80);
     } else if (/^crit[eè]re/.test(lib)) r.criteres.push(String(v).trim().slice(0, 60));
+    else if (/^personne/.test(lib)) r.personnes.push(String(v).trim().slice(0, 30));
   });
   return r;
+}
+
+/* Onglet Journal : une ligne par événement (Date, N°, Par, Type, Texte). Renvoie les plus récents, du plus ancien au plus récent. */
+function lireJournal_() {
+  const f = SpreadsheetApp.getActive().getSheetByName(ONGLET_JOURNAL);
+  if (!f || f.getLastRow() < 2) return [];
+  const res = [];
+  f.getRange(2, 1, f.getLastRow() - 1, ENTETES_JOURNAL.length).getValues().forEach(l => {
+    const le = convertirLecture_('date', l[0]);
+    const num = convertirLecture_('nombre', l[1]);
+    const texte = String(l[4] === null ? '' : l[4]).trim();
+    if (!le || typeof num !== 'number' || !texte) return;
+    const e = { le: le, num: num, type: String(l[3] || '').trim() || 'Commentaire', texte: texte.slice(0, MAX_NOTE) };
+    const par = String(l[2] || '').trim();
+    if (par) e.par = par.slice(0, 30);
+    res.push(e);
+  });
+  res.sort((x, y) => x.le < y.le ? -1 : x.le > y.le ? 1 : 0);
+  return res.slice(-MAX_JOURNAL);
+}
+
+function ongletJournal_() {
+  const c = SpreadsheetApp.getActive();
+  let f = c.getSheetByName(ONGLET_JOURNAL);
+  if (!f) {
+    f = c.insertSheet(ONGLET_JOURNAL);
+    f.getRange(1, 1, 1, ENTETES_JOURNAL.length).setValues([ENTETES_JOURNAL]).setFontWeight('bold');
+    f.setFrozenRows(1);
+    f.setColumnWidth(5, 480);
+  }
+  return f;
+}
+
+/* Ajoute une ligne au journal et la renvoie au format du site. */
+function journaliser_(num, type, texte, par) {
+  const f = ongletJournal_();
+  const maintenant = horodatage_();
+  const p = texteSur_(String(par || '').trim(), 30);
+  const t = texteSur_(String(texte || '').trim(), MAX_NOTE);
+  const ligne = f.getLastRow() + 1;
+  f.getRange(ligne, 1, 1, ENTETES_JOURNAL.length).setValues([[maintenant, num, p, type, t]]);
+  f.getRange(ligne, 1).setNumberFormat(FORMAT_DATE);
+  const e = { le: maintenant.toISOString(), num: num, type: type, texte: String(texte || '').trim().slice(0, MAX_NOTE) };
+  if (p) e.par = String(par).trim().slice(0, 30);
+  return e;
 }
 
 function lireAjouts_() {
@@ -243,14 +301,14 @@ function lireAjouts_() {
 
 /* ---------------- Écriture : statuts ---------------- */
 
-function changerStatut_(action, corps) {
+/* Relit l'onglet Annonces sous verrou et retrouve la ligne d'une annonce visible par son N°. */
+function ligneAnnonce_(corps, colonnes) {
   const num = Number(corps.num);
   if (!(num > 0)) throw new Error("Numéro d'annonce manquant.");
   const f = onglet_(ONGLET_ANNONCES);
-  // Relire l'état juste avant d'écrire, sous verrou, et retrouver la ligne par N°.
   const valeurs = f.getDataRange().getValues();
   const idx = indexEntetes_(valeurs[0]);
-  ['num'].concat(ECRITES_PAR_LE_SITE).forEach(k => {
+  ['num'].concat(colonnes).forEach(k => {
     if (idx[k] === undefined) throw new Error('Colonne absente du tableau : ' + enTete_(k));
   });
   let i = -1;
@@ -260,6 +318,19 @@ function changerStatut_(action, corps) {
   if (i < 0) throw new Error('Annonce n°' + num + ' introuvable.');
   const avant = ligneVersAnnonce_(valeurs[i], idx);
   if (avant.masquee) throw new Error('Annonce n°' + num + ' introuvable.');
+  return { f: f, idx: idx, ligne: i + 1, largeur: valeurs[0].length, num: num, avant: avant };
+}
+
+function relireAnnonce_(L) {
+  SpreadsheetApp.flush();
+  const apres = L.f.getRange(L.ligne, 1, 1, L.largeur).getValues()[0];
+  return pourSite_(ligneVersAnnonce_(apres, L.idx));
+}
+
+/* Renvoie { annonce, journal: [entrée ajoutée] } ; journal vide si rien n'a changé. */
+function changerStatut_(action, corps) {
+  const L = ligneAnnonce_(corps, ECRITES_PAR_LE_SITE.filter(k => k !== 'notes'));
+  const f = L.f, idx = L.idx, i = L.ligne - 1, num = L.num, avant = L.avant;
 
   const maintenant = horodatage_();
   const maj = {};
@@ -282,6 +353,8 @@ function changerStatut_(action, corps) {
     maj.favori = '';
     maj.enContact = '';
     maj.enContactDepuis = '';
+    const raison = String(corps.raison === undefined || corps.raison === null ? '' : corps.raison).trim();
+    if (raison) maj.raisonCorbeille = texteSur_(raison, MAX_RAISON);
   } else if (action === 'restaurer') {
     maj.corbeille = '';
     maj.corbeilleLe = '';
@@ -295,9 +368,34 @@ function changerStatut_(action, corps) {
     r.setValue(maj[k]);
     if (maj[k] instanceof Date) r.setNumberFormat(FORMAT_DATE);
   });
-  SpreadsheetApp.flush();
-  const apres = f.getRange(i + 1, 1, 1, valeurs[0].length).getValues()[0];
-  return pourSite_(ligneVersAnnonce_(apres, idx));
+
+  // Journal : seulement si le statut change vraiment (un double appui n'ajoute pas de ligne).
+  const journal = [];
+  let texte = null;
+  if (action === 'favori' && !!corps.valeur !== !!avant.favori) texte = corps.valeur ? 'Ajoutée aux favoris' : 'Retirée des favoris';
+  else if (action === 'contact' && !!corps.valeur !== !!avant.enContact) texte = corps.valeur ? 'Passée en contact' : 'Retirée du suivi';
+  else if (action === 'corbeille' && !avant.corbeille) texte = 'Mise à la corbeille' + (maj.raisonCorbeille ? ' : ' + String(corps.raison).trim().slice(0, MAX_RAISON) : '');
+  else if (action === 'restaurer' && avant.corbeille) texte = 'Restaurée';
+  const types = { favori: 'Favori', contact: 'Contact', corbeille: 'Corbeille', restaurer: 'Restauration' };
+  if (texte) journal.push(journaliser_(num, types[action], texte, corps.par));
+
+  return { annonce: relireAnnonce_(L), journal: journal };
+}
+
+/* Note libre d'une annonce : remplacée en entier, ou vidée si le texte est vide. Pas de ligne de journal. */
+function ecrireNote_(corps) {
+  const L = ligneAnnonce_(corps, ['notes']);
+  const t = String(corps.texte === undefined || corps.texte === null ? '' : corps.texte).trim();
+  L.f.getRange(L.ligne, L.idx.notes + 1).setValue(t ? texteSur_(t, MAX_NOTE) : '');
+  return relireAnnonce_(L);
+}
+
+/* Commentaire ajouté depuis le site. Le journal ne se modifie ni ne se supprime depuis le site. */
+function ajouterAuJournal_(corps) {
+  const L = ligneAnnonce_(corps, []);
+  const t = String(corps.texte === undefined || corps.texte === null ? '' : corps.texte).trim();
+  if (!t) throw new Error('Commentaire vide.');
+  return journaliser_(L.num, 'Commentaire', t, corps.par);
 }
 
 /* ---------------- Ajouts : vérification et envoi ---------------- */
@@ -621,6 +719,7 @@ function testerLecture() {
   Logger.log('ok=%s, %s annonces visibles, dernière veille %s, stats %s',
     r.ok, r.annonces ? r.annonces.length : 0, r.rapport ? r.rapport.derniereVeille : '-', r.rapport ? JSON.stringify(r.rapport.stats) : '-');
   Logger.log('réglages %s', JSON.stringify(r.reglages));
+  Logger.log('journal : %s entrées', r.journal ? r.journal.length : 0);
   if (!r.ok) Logger.log(r.erreur);
 }
 

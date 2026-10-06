@@ -3,11 +3,13 @@
   var CONFIG = window.CONFIG || {};
   var PROD = location.origin === CONFIG.ORIGINE_PROD;
   var MODE_TEST = CONFIG.MODE_TEST === true || (!PROD && /[?&]test=1(&|$)/.test(location.search));
-  var LS_CLE = "onh-cle", LS_CACHE = MODE_TEST ? "onh-cache-test" : "onh-cache-v3", LS_UI = "onh-ui", LS_API = "onh-api-test";
+  var LS_CLE = "onh-cle", LS_CACHE = MODE_TEST ? "onh-cache-test" : "onh-cache-v3", LS_UI = "onh-ui", LS_API = "onh-api-test", LS_MOI = "onh-moi";
   var DELAI_MAX = 25000, DELAI_RELECTURE = 30000, JOUR = 864e5;
   var NOTAIRE = 0.075, MAX_COMPARER = 3;
   /* Plafonds, cibles par Prio et critères : servis par l'API avec la clé (onglet Réglages), jamais dans le dépôt. */
-  var PRIOS = {}, PLAFOND = null, PLAFOND_MAX = null, CRITERES = [];
+  var PRIOS = {}, PLAFOND = null, PLAFOND_MAX = null, CRITERES = [], PERSONNES = [];
+  var MAX_NOTE = 2000, MAX_RAISON = 500, JOURNAL_VISIBLE = 5;
+  var RAISONS_RAPIDES = ["Trop cher", "Trop de travaux", "Pas de jardin", "Mauvais quartier", "Déjà vendue"];
   var TRIS = [
     {id:"pertinence", nom:"Pertinence", court:"Pertinence", sous:"Adéquation IA"},
     {id:"prixAsc", nom:"Prix croissant", court:"Prix ↑"},
@@ -15,6 +17,8 @@
     {id:"recent", nom:"Plus récentes", court:"Récentes"}
   ];
   var CHAMPS_STATUT = ["favori", "enContact", "enContactDepuis", "corbeille", "corbeilleLe", "statutLe", "raisonCorbeille"];
+  /* Champs gardés en local pendant une écriture en cours (mise à jour optimiste). */
+  var CHAMPS_LOCAUX = CHAMPS_STATUT.concat(["notes"]);
   var API_TEST = /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/;
 
   /* ---------- Outils ---------- */
@@ -50,6 +54,10 @@
     retour:'<path d="m15 18-6-6 6-6"/>',
     fleche:'<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
     gauche:'<path d="M19 12H5"/><path d="m12 19-7-7 7-7"/>',
+    message:'<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+    historique:'<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
+    crayon:'<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+    envoyer:'<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>',
     partager:'<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/>'
   };
   function ico(nom, plein){
@@ -144,7 +152,7 @@
     cle:null, api:CONFIG.API_URL, route:{nom:"accueil"}, fond:{nom:"accueil"}, fichePush:false,
     bureau:false, menu:false, tri:null, triBrouillon:null, choix:false,
     chargement:false, echec:false, dernierEssai:0, erreurTexte:"",
-    ops:{}, files:{}, confirmer:null,
+    ops:{}, files:{}, dialogue:null, brouillons:{}, journalTout:{}, rendreEnAttente:false, appui:false,
     ajout:{texte:"", resultats:null, coches:{}, verif:false, envoi:false, fait:null}
   };
   var D = null;
@@ -274,6 +282,7 @@
         d.annonces.forEach(function(a){ ["repereeLe","statutLe","enContactDepuis","corbeilleLe"].forEach(function(k){ recaler(a, k); }); });
         (d.ajouts || []).forEach(function(x){ recaler(x, "ajouteLe"); });
         recaler(d.rapport, "derniereVeille");
+        (d.journal || []).forEach(function(e){ recaler(e, "le"); });
         test.base = d; return d;
       });
     },
@@ -286,7 +295,7 @@
     lire:function(){
       return test.charger().then(function(d){
         if (test.echouer()) return test.attendre().then(function(){ throw erreur("Le serveur ne répond pas (échec simulé)."); });
-        var r = test.copie({rapport:d.rapport, reglages:d.reglages, annonces:d.annonces.filter(function(a){ return !a.masquee; })});
+        var r = test.copie({rapport:d.rapport, reglages:d.reglages, annonces:d.annonces.filter(function(a){ return !a.masquee; }), journal:d.journal || []});
         r.ok = true; r.lu = new Date().toISOString();
         return test.attendre(r);
       });
@@ -340,8 +349,29 @@
         var a = null;
         d.annonces.forEach(function(x){ if (x.num === c.num && !x.masquee) a = x; });
         if (!a) return test.attendre().then(function(){ throw erreur("Annonce n°" + c.num + " introuvable."); });
+        d.journal = d.journal || [];
+        function journaliser(type, texte){
+          var e = {le:new Date().toISOString(), num:a.num, type:type, texte:texte};
+          if (txt(c.par)) e.par = txt(c.par);
+          d.journal.push(e); return e;
+        }
+        if (c.action === "note"){
+          if (txt(c.texte)) a.notes = txt(c.texte); else delete a.notes;
+          return test.attendre({ok:true, annonce:test.copie(a)});
+        }
+        if (c.action === "journal"){
+          if (!txt(c.texte)) return test.attendre().then(function(){ throw erreur("Commentaire vide."); });
+          return test.attendre({ok:true, entree:test.copie(journaliser("Commentaire", txt(c.texte)))});
+        }
+        /* Même règle que changerStatut_ (Code.gs) : une ligne de journal seulement si le statut change. */
+        var t = null;
+        if (c.action === "favori" && !!c.valeur !== !!a.favori) t = ["Favori", c.valeur ? "Ajoutée aux favoris" : "Retirée des favoris"];
+        else if (c.action === "contact" && !!c.valeur !== !!a.enContact) t = ["Contact", c.valeur ? "Passée en contact" : "Retirée du suivi"];
+        else if (c.action === "corbeille" && !a.corbeille) t = ["Corbeille", "Mise à la corbeille" + (txt(c.raison) ? " : " + txt(c.raison) : "")];
+        else if (c.action === "restaurer" && a.corbeille) t = ["Restauration", "Restaurée"];
         appliquerStatut(a, c.action, c.valeur, new Date().toISOString());
-        return test.attendre({ok:true, annonce:test.copie(a)});
+        if (c.action === "corbeille" && txt(c.raison)) a.raisonCorbeille = txt(c.raison);
+        return test.attendre({ok:true, annonce:test.copie(a), journal:t ? [test.copie(journaliser(t[0], t[1]))] : []});
       });
     }
   };
@@ -425,13 +455,14 @@
       return c && Array.isArray(c.annonces) ? c : null;
     } catch(e){ return null; }
   }
-  function ecrireCache(){ if (D) lsSet(LS_CACHE, JSON.stringify({lu:D.lu, rapport:D.rapport, reglages:D.reglages, annonces:D.annonces})); }
+  function ecrireCache(){ if (D) lsSet(LS_CACHE, JSON.stringify({lu:D.lu, rapport:D.rapport, reglages:D.reglages, annonces:D.annonces, journal:D.journal.filter(function(e){ return !e.local; })})); }
   function appliquerReglages(g){
     g = g || {};
     PLAFOND = estNb(g.plafond) ? g.plafond : null;
     PLAFOND_MAX = estNb(g.plafondMax) ? g.plafondMax : PLAFOND;
     PRIOS = g.prios && typeof g.prios === "object" ? g.prios : {};
     CRITERES = Array.isArray(g.criteres) ? g.criteres.map(txt).filter(Boolean) : [];
+    PERSONNES = Array.isArray(g.personnes) ? g.personnes.map(txt).filter(Boolean) : [];
   }
   function charger(force){
     if (S.chargement || (!MODE_TEST && !S.cle)) return;
@@ -459,10 +490,13 @@
     liste = liste.map(function(a){
       if (!S.ops[a.num]) return a;
       var local = trouver(a.num);
-      if (local) CHAMPS_STATUT.forEach(function(k){ if (k in local) a[k] = local[k]; else delete a[k]; });
+      if (local) CHAMPS_LOCAUX.forEach(function(k){ if (k in local) a[k] = local[k]; else delete a[k]; });
       return a;
     });
-    D = {annonces:liste, rapport:r.rapport || {}, reglages:r.reglages || null, lu:r.lu || new Date().toISOString()};
+    /* Les commentaires pas encore confirmés par le tableau restent affichés. */
+    var enCours = D ? D.journal.filter(function(e){ return e.local; }) : [];
+    D = {annonces:liste, rapport:r.rapport || {}, reglages:r.reglages || null, lu:r.lu || new Date().toISOString(),
+      journal:(Array.isArray(r.journal) ? r.journal : []).concat(enCours)};
     appliquerReglages(D.reglages);
     nettoyerComparer();
   }
@@ -482,10 +516,11 @@
     }
     a.statutLe = maintenant;
   }
-  function changerStatut(a, action, valeur, apres){
+  function changerStatut(a, action, valeur, apres, raison){
     var num = a.num, avant = {};
     CHAMPS_STATUT.forEach(function(k){ if (k in a) avant[k] = a[k]; });
     appliquerStatut(a, action, valeur, new Date().toISOString());
+    if (action === "corbeille" && raison) a.raisonCorbeille = raison;
     if (action === "corbeille") nettoyerComparer();
     S.ops[num] = (S.ops[num] || 0) + 1;
     rendre();
@@ -493,6 +528,8 @@
     /* Une file par annonce : deux appuis rapides partent dans l'ordre. */
     var corps = {action:action, num:num};
     if (action === "favori" || action === "contact") corps.valeur = !!valeur;
+    if (action === "corbeille" && raison) corps.raison = raison;
+    if (moi()) corps.par = moi();
     S.files[num] = (S.files[num] || Promise.resolve()).then(function(){
       return ecrire(corps).then(function(r){
         S.ops[num]--;
@@ -503,6 +540,7 @@
             CHAMPS_STATUT.forEach(function(k){ if (k in r.annonce) b[k] = r.annonce[k]; else delete b[k]; });
           }
         }
+        (Array.isArray(r.journal) ? r.journal : []).forEach(ajouterEntree);
         ecrireCache(); rendre();
       }, function(e){
         S.ops[num]--; if (!S.ops[num]) delete S.ops[num];
@@ -516,23 +554,176 @@
   }
   function basculerFavori(a){ if (!a.corbeille) changerStatut(a, "favori", !a.favori); }
   function basculerContact(a){ if (!a.corbeille) changerStatut(a, "contact", !a.enContact); }
-  function mettreCorbeille(a){
+  function mettreCorbeille(a, raison){
     changerStatut(a, "corbeille", true, function(){
       if (S.route.nom === "fiche" && S.route.num === a.num) fermerFiche();
       message("Mise à la corbeille");
-    });
+    }, raison);
   }
   function restaurer(a){ changerStatut(a, "restaurer", true, function(){ message("Restaurée dans la Prio " + a.prio); }); }
-  /* Corbeille en deux temps, pour éviter un appui malheureux. */
+  /* Corbeille : fenêtre de confirmation, avec une raison facultative (colonne « Raison corbeille »). */
   function boutonCorbeille(a, classe, contenu){
-    var arme = S.confirmer === a.num;
-    return el("button", {type:"button", classe:classe + (arme ? " a-confirmer" : ""), "aria-label":arme ? "Confirmer la mise à la corbeille" : "Mettre à la corbeille",
-      onclick:function(e){
-        e.stopPropagation();
-        if (S.confirmer === a.num){ S.confirmer = null; mettreCorbeille(a); return; }
-        S.confirmer = a.num; rendre();
-        setTimeout(function(){ if (S.confirmer === a.num){ S.confirmer = null; rendre(); } }, 3500);
-      }}, arme ? [ico("trash"), el("span", {texte:"Confirmer ?"})] : contenu);
+    return el("button", {type:"button", classe:classe, "aria-label":"Mettre à la corbeille", "aria-haspopup":"dialog",
+      onclick:function(e){ e.stopPropagation(); ouvrirDialogue({type:"corbeille", num:a.num}); }}, contenu);
+  }
+  function ouvrirDialogue(d){
+    S.dialogue = d; rendre(true);
+    /* Au clavier (ordinateur), le champ est prêt ; sur téléphone, pas de clavier qui surgit sans demande. */
+    if (S.bureau) setTimeout(function(){ var z = document.querySelector(".dialogue textarea"); if (z) z.focus(); }, 30);
+  }
+  function fermerDialogue(){ if (!S.dialogue) return; S.dialogue = null; rendre(true); }
+
+  /* ---------- Auteur des écritures (prénoms de l'onglet Réglages, choisis une fois par appareil) ---------- */
+  function moi(){
+    var m = txt(lsGet(LS_MOI));
+    return m && (!PERSONNES.length || PERSONNES.indexOf(m) >= 0) ? m : null;
+  }
+  function choixMoi(){
+    if (!PERSONNES.length) return null;
+    var m = moi();
+    return el("div", {classe:"choix-moi", role:"group", "aria-label":"Qui écrit ?"}, [el("span", {texte:"Vous êtes"})].concat(PERSONNES.map(function(p){
+      return el("button", {type:"button", classe:"puce", "aria-pressed":m === p ? "true" : "false", onclick:function(){ lsSet(LS_MOI, p); rendre(true); }}, [p]);
+    })));
+  }
+
+  /* ---------- Note (mémo libre, une par annonce) ---------- */
+  function cleNote(a){ return "note-" + a.num; }
+  function brouillonNote(a){ var b = S.brouillons[cleNote(a)]; return b !== undefined ? b : txt(a.notes); }
+  function enregistrerNote(a, texte){
+    var v = txt(texte).slice(0, MAX_NOTE), avant = a.notes;
+    if (v === txt(a.notes)){ delete S.brouillons[cleNote(a)]; return; }
+    var num = a.num;
+    if (v) a.notes = v; else delete a.notes;
+    delete S.brouillons[cleNote(a)];
+    S.ops[num] = (S.ops[num] || 0) + 1;
+    demanderRendu();
+    S.files[num] = (S.files[num] || Promise.resolve()).then(function(){
+      return ecrire({action:"note", num:num, texte:v}).then(function(r){
+        S.ops[num]--; if (!S.ops[num]) delete S.ops[num];
+        var b = trouver(num) || a;
+        if (r.annonce && r.annonce.num === num){ if (txt(r.annonce.notes)) b.notes = r.annonce.notes; else delete b.notes; }
+        ecrireCache();
+        message(v ? "Note enregistrée" : "Note vidée");
+        demanderRendu();
+      }, function(e){
+        S.ops[num]--; if (!S.ops[num]) delete S.ops[num];
+        if (e.cle){ cleInvalide(); return; }
+        var b = trouver(num) || a;
+        if (avant === undefined) delete b.notes; else b.notes = avant;
+        if (S.brouillons[cleNote(a)] === undefined) S.brouillons[cleNote(a)] = v;
+        message("Note pas enregistrée : " + e.message, "erreur");
+        demanderRendu();
+      });
+    });
+  }
+  function blocNote(a){
+    var k = cleNote(a), valeur = brouillonNote(a), modifiee = valeur.trim() !== txt(a.notes);
+    var zone = el("textarea", {rows:"3", maxlength:String(MAX_NOTE), "data-saisie":k, "aria-label":"Note sur l'annonce n°" + a.num,
+      placeholder:"Mémo pour vous deux : contact de l'agence, questions à poser…"});
+    zone.value = valeur;
+    var bouton = el("button", {type:"button", classe:"btn btn-encre btn-petit", disabled:!modifiee, onclick:function(){ enregistrerNote(a, zone.value); }}, ["Enregistrer"]);
+    var etat = el("span", {classe:"note-etat", texte:S.ops[a.num] ? "Enregistrement…" : modifiee ? "Modifiée, pas encore enregistrée" : ""});
+    zone.addEventListener("input", function(){
+      S.brouillons[k] = zone.value;
+      var m = zone.value.trim() !== txt(a.notes);
+      bouton.disabled = !m; etat.textContent = m ? "Modifiée, pas encore enregistrée" : "";
+    });
+    zone.addEventListener("blur", function(){ if (zone.value.trim() !== txt(a.notes)) enregistrerNote(a, zone.value); });
+    return el("section", {classe:"fiche-sec fiche-note"}, [
+      el("h3", {classe:"surtitre-sec"}, [ico("crayon"), " Note"]),
+      zone,
+      el("div", {classe:"note-bas"}, [
+        etat,
+        txt(a.notes) ? el("button", {type:"button", classe:"btn btn-contour btn-petit", onclick:function(){ ouvrirDialogue({type:"viderNote", num:a.num}); }}, ["Vider"]) : null,
+        bouton
+      ])
+    ]);
+  }
+
+  /* ---------- Journal de suivi (onglet Journal du tableau, non modifiable depuis le site) ---------- */
+  function cleEntree(e){ return [e.num, e.le, e.type, e.texte].join("|"); }
+  function ajouterEntree(e){
+    if (!D || !e || !estNb(e.num)) return;
+    var k = cleEntree(e);
+    if (D.journal.some(function(x){ return !x.local && cleEntree(x) === k; })) return;
+    D.journal.push(e);
+  }
+  function journalDe(num){
+    if (!D) return [];
+    return D.journal.filter(function(e){ return e.num === num; }).sort(function(x, y){ return txt(x.le).localeCompare(txt(y.le)); });
+  }
+  function quand(iso){
+    var d = date(iso); if (!d) return "";
+    var jour = function(x){ return x.toLocaleDateString("fr-FR", {timeZone:"Europe/Paris"}); };
+    var auj = new Date(), hier = new Date(Date.now() - JOUR);
+    var j = jour(d) === jour(auj) ? "aujourd'hui" : jour(d) === jour(hier) ? "hier" : jourCourt(iso);
+    return j + " · " + heure(iso);
+  }
+  var ICONES_JOURNAL = {Favori:"heart", Contact:"phone", Corbeille:"trash", Restauration:"retour", Commentaire:"message"};
+  function icoEntree(e){ return ico(ICONES_JOURNAL[e.type] || "historique"); }
+  function envoyerCommentaire(a, zone){
+    var k = "journal-" + a.num, texte = txt(zone ? zone.value : S.brouillons[k]).slice(0, MAX_NOTE);
+    if (!texte) return;
+    if (PERSONNES.length && !moi()){ message("Choisissez d'abord qui écrit.", "erreur"); return; }
+    var e = {num:a.num, le:new Date().toISOString(), type:"Commentaire", texte:texte, local:true};
+    if (moi()) e.par = moi();
+    D.journal.push(e);
+    delete S.brouillons[k];
+    if (zone) zone.blur();
+    rendre(true);
+    var corps = {action:"journal", num:a.num, texte:texte};
+    if (e.par) corps.par = e.par;
+    ecrire(corps).then(function(r){
+      D.journal = D.journal.filter(function(x){ return x !== e; });
+      ajouterEntree(r.entree || {num:e.num, le:e.le, type:e.type, texte:e.texte, par:e.par});
+      ecrireCache();
+      message("Ajouté au journal");
+      demanderRendu();
+    }, function(err){
+      D.journal = D.journal.filter(function(x){ return x !== e; });
+      if (err.cle){ cleInvalide(); return; }
+      if (!txt(S.brouillons[k])) S.brouillons[k] = texte;
+      message("Pas ajouté au journal : " + err.message, "erreur");
+      demanderRendu();
+    });
+  }
+  function entreeJournal(e){
+    var auteur = txt(e.par);
+    if (e.type === "Commentaire"){
+      return el("li", {classe:"j-entree j-commentaire" + (e.local ? " j-envoi" : "")}, [
+        el("span", {classe:"j-pastille"}, [icoEntree(e)]),
+        el("div", {classe:"j-corps"}, [
+          el("p", {classe:"j-ligne"}, [el("b", {texte:auteur || "Commentaire"}), el("time", {datetime:e.le, texte:" · " + (e.local ? "envoi…" : quand(e.le))})]),
+          el("p", {classe:"j-bulle", texte:txt(e.texte)})
+        ])
+      ]);
+    }
+    return el("li", {classe:"j-entree j-auto"}, [
+      el("span", {classe:"j-pastille"}, [icoEntree(e)]),
+      el("p", {classe:"j-ligne"}, [
+        el("span", {texte:txt(e.texte)}),
+        auteur ? el("span", {classe:"j-par"}, [" par ", el("b", {texte:auteur})]) : null,
+        el("time", {datetime:e.le, texte:" · " + quand(e.le)})
+      ])
+    ]);
+  }
+  function blocJournal(a){
+    var l = journalDe(a.num), tout = !!S.journalTout[a.num];
+    var caches = tout ? 0 : Math.max(0, l.length - JOURNAL_VISIBLE);
+    var k = "journal-" + a.num;
+    var zone = el("textarea", {rows:"2", maxlength:String(MAX_NOTE), "data-saisie":k, "aria-label":"Ajouter au journal de l'annonce n°" + a.num,
+      placeholder:"Appel, visite, réponse de l'agence…"});
+    zone.value = S.brouillons[k] || "";
+    var bouton = el("button", {type:"button", classe:"btn btn-accent btn-petit", disabled:!txt(zone.value), onclick:function(){ envoyerCommentaire(a, zone); }}, [ico("envoyer"), el("span", {texte:"Ajouter"})]);
+    zone.addEventListener("input", function(){ S.brouillons[k] = zone.value; bouton.disabled = !txt(zone.value); });
+    zone.addEventListener("keydown", function(ev){ if (ev.key === "Enter" && (ev.metaKey || ev.ctrlKey)){ ev.preventDefault(); envoyerCommentaire(a, zone); } });
+    return el("section", {classe:"fiche-sec journal"}, [
+      el("h3", {classe:"surtitre-sec"}, [ico("historique"), " Journal de suivi"]),
+      l.length ? null : el("p", {classe:"j-vide", texte:"Rien pour l'instant. Les changements de statut s'y ajoutent tout seuls."}),
+      caches ? el("button", {type:"button", classe:"lien-txt j-plus", onclick:function(){ S.journalTout[a.num] = true; rendre(true); }}, ["Afficher " + pluriel(caches, "entrée plus ancienne", "entrées plus anciennes")]) : null,
+      l.length ? el("ol", {classe:"j-fil"}, l.slice(caches).map(entreeJournal)) : null,
+      el("div", {classe:"j-saisie"}, [choixMoi(), zone, el("div", {classe:"j-saisie-bas"}, [el("small", {classe:"gris", texte:moi() ? "En tant que " + moi() : ""}), bouton])])
+    ]);
   }
   function basculerComparer(num){
     var i = UI.compareIds.indexOf(num);
@@ -655,7 +846,8 @@
       el("div", {classe:"carte-crit", texte:criteres(a)}),
       suivi
         ? el("div", {classe:"carte-contact"}, [ico("phone"), el("span", {texte:"En contact depuis le " + (dateCourte(a.enContactDepuis) || "?")})])
-        : el("div", {classe:"carte-bas"}, [evaluation(a), caseComparer(a)])
+        : el("div", {classe:"carte-bas"}, [evaluation(a), caseComparer(a)]),
+      suivi ? derniereActivite(a) : null
     ]);
     var art = el("article", {classe:"carte" + (choisie ? " choisie" : "") + (suivi ? " carte-suivi" : ""), "aria-label":lieu(a) + ", " + (estNb(a.prix) ? euros(a.prix) : "prix non précisé")}, [
       el("div", {classe:"carte-haut"}, [image(a, {coeur:true, partage:true}), corps])
@@ -668,6 +860,13 @@
       ]));
     }
     return cliquable(art, a.num);
+  }
+  /* Carte du Suivi : la dernière entrée du journal, le fil complet est dans la fiche. */
+  function derniereActivite(a){
+    var l = journalDe(a.num), e = l[l.length - 1];
+    if (!e) return null;
+    var t = (e.type === "Commentaire" && txt(e.par) ? txt(e.par) + " : " : "") + txt(e.texte);
+    return el("div", {classe:"carte-journal"}, [icoEntree(e), el("span", null, [el("time", {datetime:e.le, texte:quand(e.le)}), " · " + tronquer(t, 140)])]);
   }
   function ligneMobile(a){
     var m2 = estNb(a.surface) ? " · " + nb(a.surface) + " m²" : "";
@@ -869,6 +1068,8 @@
         txt(a.resume) ? el("p", {classe:"fiche-resume", texte:txt(a.resume)}) : null,
         puces(a)
       ]),
+      S.fond.nom === "suivi" && !a.corbeille ? blocJournal(a) : null,
+      a.corbeille ? null : blocNote(a),
       blocCout(a),
       (plus.length || moins.length) ? el("div", {classe:"fiche-points"}, [
         plus.length ? el("section", {classe:"fiche-sec atouts"}, [el("h3", {classe:"surtitre-sec", texte:"Atouts"}), el("ul", null, plus.map(function(p){ return el("li", null, [ico("check"), el("span", {texte:txt(p)})]); }))]) : null,
@@ -1324,13 +1525,14 @@
     function retiree(a){ return "Retirée le " + (dateCourte(a.corbeilleLe || a.statutLe) || "?") + " · P" + a.prio; }
     if (S.bureau){
       box.appendChild(el("table", {classe:"tableau tableau-corbeille"}, [
-        el("thead", null, [el("tr", null, ["Prix","Quartier","Bien","Retirée",""].map(function(t){ return el("th", {scope:"col", texte:t}); }))]),
+        el("thead", null, [el("tr", null, ["Prix","Quartier","Bien","Retirée","Raison",""].map(function(t){ return el("th", {scope:"col", texte:t}); }))]),
         el("tbody", null, l.map(function(a){
           return el("tr", null, [
             el("td", {classe:"t-prix", texte:estNb(a.prix) ? euros(a.prix) : "—"}),
             el("td", {classe:"t-lieu", texte:lieu(a)}),
             el("td", {classe:"t-gris", texte:criteres(a).replace(/ · (à rafraîchir|à rénover)$/, "")}),
-            el("td", {classe:"t-gris", texte:retiree(a) + (txt(a.raisonCorbeille) ? " · " + txt(a.raisonCorbeille) : "")}),
+            el("td", {classe:"t-gris", texte:retiree(a)}),
+            el("td", {classe:"t-raison" + (txt(a.raisonCorbeille) ? "" : " t-gris"), texte:txt(a.raisonCorbeille) || "—"}),
             el("td", null, [bouton(a)])
           ]);
         }))
@@ -1341,7 +1543,8 @@
           el("div", null, [
             el("b", {texte:(estNb(a.prix) ? euros(a.prix) : "Prix ?") + " · " + lieu(a)}),
             el("p", {texte:criteres(a).replace(/ · (à rafraîchir|à rénover)$/, "")}),
-            el("small", {texte:retiree(a) + (txt(a.raisonCorbeille) ? " · " + txt(a.raisonCorbeille) : "")})
+            txt(a.raisonCorbeille) ? el("p", {classe:"raison-corbeille"}, [ico("message"), el("span", {texte:txt(a.raisonCorbeille)})]) : null,
+            el("small", {texte:retiree(a)})
           ]),
           bouton(a)
         ]);
@@ -1459,7 +1662,59 @@
     }
     if (S.tri === "feuille"){ c.appendChild(feuilleTri()); bloque = true; }
     if (S.choix && !S.bureau){ c.appendChild(feuilleChoix()); bloque = true; }
+    var dlg = dialogue();
+    if (dlg){ c.appendChild(dlg); bloque = true; }
     document.documentElement.classList.toggle("bloque", bloque);
+  }
+  function dialogue(){
+    var d = S.dialogue, a = d ? trouver(d.num) : null;
+    if (!d) return null;
+    if (!a){ S.dialogue = null; return null; }
+    var resume = ["n°" + a.num, lieu(a), estNb(a.prix) ? euros(a.prix) : null].filter(Boolean).join(" · ");
+    var corps, pied;
+    if (d.type === "corbeille"){
+      var k = "raison-" + a.num;
+      var zone = el("textarea", {rows:"3", maxlength:String(MAX_RAISON), "data-saisie":k, id:"raison-corbeille", placeholder:"Trop de travaux, quartier bruyant…"});
+      zone.value = S.brouillons[k] || "";
+      zone.addEventListener("input", function(){ S.brouillons[k] = zone.value; });
+      corps = [
+        el("p", {classe:"dlg-resume", texte:resume}),
+        el("label", {classe:"dlg-label", "for":"raison-corbeille", texte:"Pourquoi ? (facultatif)"}),
+        zone,
+        el("div", {classe:"dlg-rapides"}, RAISONS_RAPIDES.map(function(r){
+          return el("button", {type:"button", classe:"puce", onclick:function(){
+            var v = txt(zone.value); zone.value = v ? v + ", " + r.toLowerCase() : r; S.brouillons[k] = zone.value;
+          }}, [r]);
+        })),
+        el("p", {classe:"dlg-aide", texte:"La raison s'affiche dans la Corbeille. L'annonce reste connue : la veille ne la reproposera pas."})
+      ];
+      pied = [
+        el("button", {type:"button", classe:"btn btn-contour", onclick:fermerDialogue}, ["Annuler"]),
+        el("button", {type:"button", classe:"btn btn-danger", onclick:function(){
+          var raison = txt(zone.value).slice(0, MAX_RAISON);
+          delete S.brouillons[k]; S.dialogue = null;
+          mettreCorbeille(a, raison);
+        }}, [ico("trash"), el("span", {texte:"Mettre à la corbeille"})])
+      ];
+    } else {
+      corps = [
+        el("p", {classe:"dlg-resume", texte:resume}),
+        el("p", {classe:"dlg-texte", texte:"La note sera effacée du tableau, pour vous deux. Le journal de suivi n'est pas touché."})
+      ];
+      pied = [
+        el("button", {type:"button", classe:"btn btn-contour", onclick:fermerDialogue}, ["Annuler"]),
+        el("button", {type:"button", classe:"btn btn-danger", onclick:function(){ S.dialogue = null; delete S.brouillons[cleNote(a)]; enregistrerNote(a, ""); rendre(true); }}, ["Vider la note"])
+      ];
+    }
+    var titre = d.type === "corbeille" ? "Mettre à la corbeille ?" : "Vider la note ?";
+    return el("div", {classe:"couche couche-dialogue"}, [
+      el("div", {classe:"voile", onclick:fermerDialogue}),
+      el("div", {classe:"feuille dialogue", role:"alertdialog", "aria-modal":"true", "aria-label":titre}, [
+        el("div", {classe:"feuille-tete"}, [el("h2", {texte:titre}), el("button", {type:"button", classe:"btn-ico", "aria-label":"Fermer", onclick:fermerDialogue}, [ico("x")])]),
+        el("div", {classe:"feuille-corps dlg-corps"}, corps),
+        el("div", {classe:"feuille-pied dlg-pied"}, pied)
+      ])
+    ]);
   }
   function ecranCle(){
     if (S.cleRefusee) return el("div", {classe:"ecran"}, [el("h2", {texte:"Clé refusée"}), el("p", {texte:"Le tableau a refusé la clé de ce lien. Ouvrez le dernier lien reçu par mail : la clé a peut-être changé."})]);
@@ -1499,7 +1754,14 @@
       if (v){ n.scrollTop = v[0]; n.scrollLeft = v[1]; }
     });
   }
-  function rendre(){
+  /* Un champ marqué data-saisie garde son texte, son curseur et le clavier du téléphone :
+     le rendu attend que la saisie soit finie (relecture automatique, réponse du tableau). */
+  function champActif(){ var f = document.activeElement; return f && f.hasAttribute && f.hasAttribute("data-saisie") ? f : null; }
+  function rendreSiAttente(){ if (S.rendreEnAttente && !S.appui && !champActif()) rendre(); }
+  function demanderRendu(){ S.rendreEnAttente = true; setTimeout(rendreSiAttente, 0); }
+  function rendre(force){
+    if (!force && champActif()){ S.rendreEnAttente = true; return; }
+    S.rendreEnAttente = false;
     var y = window.scrollY, g = garderDefilements();
     /* Fiche ouverte par un lien direct : la liste derrière est celle de sa Prio. */
     if (S.fondAuto && D){
@@ -1605,8 +1867,15 @@
   document.addEventListener("visibilitychange", function(){ if (document.visibilityState === "visible") charger(false); });
   window.addEventListener("focus", function(){ charger(false); });
   window.addEventListener("online", function(){ if (S.echec) charger(true); });
+  /* Pendant un appui (doigt ou souris), le rendu attend : sinon le bouton visé serait remplacé avant le clic. */
+  document.addEventListener("pointerdown", function(){ S.appui = true; }, true);
+  function finAppui(){ S.appui = false; setTimeout(rendreSiAttente, 350); }
+  document.addEventListener("pointerup", finAppui, true);
+  document.addEventListener("pointercancel", finAppui, true);
+  document.addEventListener("focusout", function(){ setTimeout(rendreSiAttente, 0); });
   document.addEventListener("keydown", function(e){
     if (e.key !== "Escape") return;
+    if (S.dialogue){ fermerDialogue(); return; }
     if (S.tri || S.menu || S.choix){ S.tri = null; S.menu = false; S.choix = false; rendre(); }
     else if (S.route.nom === "fiche") fermerFiche();
   });

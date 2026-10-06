@@ -38,6 +38,10 @@
       "Critère fictif 1",
       "Critère fictif 2",
       "Critère fictif 3"
+    ],
+    "personnes": [
+      "Personne A",
+      "Personne B"
     ]
   },
   "ajouts": [
@@ -104,7 +108,8 @@
       "energieMin": 2160,
       "energieMax": 2940,
       "taxeFonciere": 1680,
-      "lienVerifieLe": "2026-10-05T08:40:00.000Z"
+      "lienVerifieLe": "2026-10-05T08:40:00.000Z",
+      "notes": "Mémo fictif : agence Exemple, demander le diagnostic toiture."
     },
     {
       "num": 102,
@@ -337,6 +342,42 @@
       "titre": "Annonce masquée : ne doit jamais s'afficher",
       "lienVerifieLe": "2026-10-05T08:40:00.000Z",
       "raisonMasquee": "au-delà du plafond de 520 000 € frais compris"
+    }
+  ],
+  "journal": [
+    {
+      "le": "2026-10-01T09:00:00.000Z",
+      "num": 101,
+      "par": "Personne A",
+      "type": "Favori",
+      "texte": "Ajoutée aux favoris"
+    },
+    {
+      "le": "2026-10-03T08:00:00.000Z",
+      "num": 101,
+      "par": "Personne B",
+      "type": "Contact",
+      "texte": "Passée en contact"
+    },
+    {
+      "le": "2026-10-03T08:20:00.000Z",
+      "num": 101,
+      "par": "Personne B",
+      "type": "Commentaire",
+      "texte": "Appel à l'agence fictive : visite possible samedi matin."
+    },
+    {
+      "le": "2026-10-04T17:45:00.000Z",
+      "num": 101,
+      "par": "Personne A",
+      "type": "Commentaire",
+      "texte": "Visite confirmée samedi 10 h. Penser à demander la taxe foncière exacte."
+    },
+    {
+      "le": "2026-09-28T08:00:00.000Z",
+      "num": 103,
+      "type": "Contact",
+      "texte": "Passée en contact"
     }
   ]
 }

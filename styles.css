@@ -561,3 +561,61 @@ body.sans-onglets .message{bottom:calc(84px + env(safe-area-inset-bottom, 0px))}
   .tableau-corbeille .btn{min-height:36px;border-radius:var(--r-pilule)}
   .vide{padding:40px 28px}
 }
+
+/* ---------- V3.5 : note, journal de suivi, fenêtre de confirmation ---------- */
+.btn-petit{min-height:40px;padding:0 14px;font-size:13px;border-radius:var(--r-pilule)}
+.btn-petit .ico{width:16px;height:16px}
+.btn-danger{background:var(--max-texte);color:#fff}
+.btn-danger .ico{width:18px;height:18px}
+
+/* Champs de saisie (note, journal, raison) : même style que la zone de liens. */
+.fiche-note textarea,.j-saisie textarea,.dialogue textarea{display:block;width:100%;border:1.5px solid var(--ligne-forte);background:var(--surface);border-radius:12px;padding:10px 12px;
+  font:400 16px/1.5 var(--police);color:var(--encre);resize:vertical;box-shadow:inset 0 1px 2px rgba(0,0,0,.03)}
+.fiche-note textarea:focus,.j-saisie textarea:focus,.dialogue textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-100)}
+.note-bas,.j-saisie-bas{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:8px;flex-wrap:wrap}
+.note-etat,.j-saisie-bas small{margin-right:auto;font-size:12px;color:var(--gris)}
+
+/* Journal façon fil d'activité : pastilles reliées par un trait vertical. */
+.j-vide{font-size:13px;color:var(--gris);margin-bottom:12px}
+.j-plus{display:block;font-size:13px;color:var(--gris);margin:0 0 10px 40px;min-height:32px}
+.j-fil{list-style:none;margin:0 0 14px;padding:0;position:relative}
+.j-entree{position:relative;display:flex;gap:12px;align-items:flex-start;padding-bottom:14px}
+.j-entree:not(:last-child)::before{content:"";position:absolute;left:13px;top:28px;bottom:0;width:2px;background:var(--ligne)}
+.j-pastille{flex:none;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--creux);color:var(--gris);position:relative;z-index:1}
+.j-pastille .ico{width:14px;height:14px}
+.j-commentaire .j-pastille{background:var(--accent-100);color:var(--accent-600)}
+.j-corps{flex:1;min-width:0}
+.j-ligne{font-size:13px;line-height:1.45;color:var(--encre);padding-top:5px}
+.j-auto .j-ligne{color:var(--gris)}
+.j-ligne b{font-weight:700;color:var(--encre)}
+.j-ligne time{color:var(--gris-clair);white-space:nowrap}
+.j-bulle{margin-top:6px;padding:10px 12px;background:var(--fond);border:1px solid var(--ligne);border-radius:4px 12px 12px 12px;font-size:14px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
+.j-envoi{opacity:.6}
+.j-saisie{border-top:1px solid var(--ligne);padding-top:12px}
+.choix-moi{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px;font-size:13px;color:var(--gris)}
+.choix-moi > span{margin-right:2px}
+
+/* Carte du Suivi : dernière activité sur deux lignes au plus. */
+.carte-journal{display:flex;gap:6px;align-items:flex-start;margin-top:6px;font-size:12.5px;line-height:1.4;color:var(--gris)}
+.carte-journal .ico{width:14px;height:14px;margin-top:2px;flex:none}
+.carte-journal > span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.carte-journal time{font-weight:700;color:var(--encre)}
+
+/* Corbeille : la raison sur sa propre ligne. */
+.raison-corbeille{display:flex;gap:6px;align-items:flex-start;font-size:13px !important;color:var(--encre) !important;font-style:italic;margin-top:6px !important}
+.raison-corbeille .ico{width:14px;height:14px;margin-top:2px;color:var(--gris);flex:none}
+.t-raison{font-style:italic}
+
+/* Fenêtre de confirmation : feuille du bas sur téléphone, fenêtre centrée sur ordinateur. */
+.couche-dialogue{z-index:60}
+.dlg-corps{padding:0 var(--gouttiere) 4px;display:flex;flex-direction:column;gap:8px}
+.dlg-resume{font-size:14px;font-weight:600;color:var(--gris)}
+.dlg-label{font-size:13px;font-weight:700;margin-top:6px}
+.dlg-texte,.dlg-aide{font-size:13px;color:var(--gris)}
+.dlg-rapides{display:flex;flex-wrap:wrap;gap:6px}
+.dlg-rapides .puce{min-height:36px}
+.dlg-pied{display:grid;grid-template-columns:1fr 1.6fr;gap:10px}
+@media (min-width:1024px){
+  .dialogue{left:50%;top:50%;bottom:auto;right:auto;width:460px;max-height:80vh;transform:translate(-50%,-50%);border-radius:20px;animation:apparait .15s ease}
+  .dlg-pied{padding-bottom:16px}
+}
