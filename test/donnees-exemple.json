@@ -1,0 +1,328 @@
+{
+  "ok": true,
+  "lu": "2026-10-05T18:05:00.000Z",
+  "rapport": {
+    "derniereVeille": "2026-10-05T18:00:00.000Z",
+    "stats": {
+      "lues": 46,
+      "retenues": 7,
+      "doublons": 12
+    },
+    "paragraphes": [
+      "Données fictives pour développer le site sans toucher au vrai tableau.",
+      "Deux pépites fictives, une annonce masquée qui ne doit jamais s'afficher, deux annonces dans la corbeille."
+    ]
+  },
+  "reglages": {
+    "plafond": 600000,
+    "plafondMax": 640000,
+    "prios": {
+      "1": {
+        "cibleMax": 560000,
+        "zone": "Zone fictive A"
+      },
+      "2": {
+        "cibleMax": 540000,
+        "zone": "Zone fictive B"
+      },
+      "3": {
+        "cibleMax": 480000,
+        "zone": "Zone fictive C"
+      },
+      "4": {
+        "cibleMax": 440000,
+        "zone": "Zone fictive D"
+      }
+    },
+    "criteres": [
+      "Critère fictif 1",
+      "Critère fictif 2",
+      "Critère fictif 3"
+    ]
+  },
+  "ajouts": [
+    {
+      "lien": "https://www.pap.fr/annonces/maison-exemple-r400000001",
+      "ajouteLe": "2026-10-04T10:00:00.000Z"
+    },
+    {
+      "lien": "https://www.leboncoin.fr/vi/3282415925.htm",
+      "ajouteLe": "2026-10-05T18:30:00.000Z",
+      "traite": true,
+      "traiteLe": "2026-10-06T09:00:00.000Z",
+      "resultat": "Écartée : appartement, pas une maison. Annonce lue via l'alerte Leboncoin transférée ; aucune correspondance avec les critères de la Prio 1, et prix hors cible après frais."
+    }
+  ],
+  "annonces": [
+    {
+      "num": 101,
+      "prio": 1,
+      "commune": "Ville Exemple",
+      "quartier": "Quartier Exemple",
+      "prix": 395000,
+      "surface": 125,
+      "pieces": 5,
+      "chambres": 4,
+      "terrain": 400,
+      "dpe": "C",
+      "garage": true,
+      "lien": "https://example.com/annonce-101",
+      "source": "Agence Exemple",
+      "repereeLe": "2026-10-04T18:00:00.000Z",
+      "pepite": true,
+      "score": 95,
+      "atouts": [
+        "Annonce fictive bien placée",
+        "Jardin de 400 m²",
+        "4 chambres"
+      ],
+      "vigilance": [
+        "Rien de réel : données de test",
+        "Travaux de rafraîchissement à chiffrer"
+      ],
+      "resume": "Pépite fictive pour tester l'accueil, la fiche et le comparateur.",
+      "titre": "Maison fictive avec jardin et garage",
+      "favori": true,
+      "enContact": true,
+      "enContactDepuis": "2026-10-03T08:00:00.000Z",
+      "statutLe": "2026-10-03T08:00:00.000Z",
+      "etat": "À rafraîchir",
+      "energieMin": 2160,
+      "energieMax": 2940,
+      "taxeFonciere": 1680,
+      "lienVerifieLe": "2026-10-05T08:40:00.000Z"
+    },
+    {
+      "num": 102,
+      "prio": 1,
+      "commune": "Ville Exemple",
+      "quartier": "Rue Fictive",
+      "prix": 409000,
+      "surface": 135,
+      "pieces": 6,
+      "chambres": 5,
+      "terrain": 600,
+      "dpe": "D",
+      "garage": false,
+      "lien": "https://example.com/annonce-102",
+      "source": "Site Fictif",
+      "repereeLe": "2026-09-30T18:00:00.000Z",
+      "pepite": true,
+      "score": 88,
+      "atouts": [
+        "Grande surface"
+      ],
+      "vigilance": [
+        "Au-dessus de la cible"
+      ],
+      "resume": "Pépite fictive en favori, sans photo, avec énergie seule.",
+      "favori": true,
+      "energieMin": 2520,
+      "energieMax": 3420
+    },
+    {
+      "num": 103,
+      "prio": 1,
+      "commune": "Ville Exemple C",
+      "prix": 418000,
+      "surface": 128,
+      "pieces": 5,
+      "chambres": 4,
+      "terrain": 520,
+      "dpe": "B",
+      "garage": true,
+      "lien": "https://example.com/annonce-103",
+      "source": "Ajout manuel",
+      "repereeLe": "2026-09-20T18:00:00.000Z",
+      "score": 84,
+      "resume": "Annonce fictive sans quartier : la commune s'affiche à la place.",
+      "enContact": true,
+      "enContactDepuis": "2026-09-28T08:00:00.000Z",
+      "etat": "Habitable en l'état",
+      "taxeFonciere": 1500,
+      "lienVerifieLe": "2026-10-05T08:40:00.000Z"
+    },
+    {
+      "num": 104,
+      "prio": 1,
+      "prix": 372000,
+      "surface": 110,
+      "pieces": 4,
+      "chambres": 3,
+      "terrain": 250,
+      "dpe": "D",
+      "lien": "https://example.com/annonce-104",
+      "source": "SeLoger",
+      "repereeLe": "2026-10-04T08:00:00.000Z",
+      "score": 70,
+      "resume": "Annonce fictive sans quartier ni commune.",
+      "etat": "À rénover",
+      "lienVerifieLe": "2026-10-05T08:40:00.000Z"
+    },
+    {
+      "num": 201,
+      "prio": 2,
+      "commune": "Ville Exemple",
+      "quartier": "Parc Exemple",
+      "prix": 440000,
+      "surface": 133,
+      "pieces": 7,
+      "chambres": 5,
+      "terrain": 503,
+      "lien": "https://example.com/annonce-201",
+      "source": "Agence Exemple",
+      "repereeLe": "2026-09-25T18:00:00.000Z",
+      "score": 62,
+      "atouts": [
+        "5 chambres"
+      ],
+      "vigilance": [
+        "DPE et garage non précisés"
+      ],
+      "resume": "Données minces : beaucoup de « non précisé ».",
+      "lienVerifieLe": "2026-10-05T08:40:00.000Z"
+    },
+    {
+      "num": 202,
+      "prio": 2,
+      "commune": "Ville Exemple B",
+      "prix": 520000,
+      "surface": 152,
+      "pieces": 6,
+      "chambres": 4,
+      "terrain": 640,
+      "dpe": "C",
+      "garage": true,
+      "lien": "https://example.com/annonce-202",
+      "source": "Agence Exemple",
+      "repereeLe": "2026-09-21T18:00:00.000Z",
+      "score": 45,
+      "resume": "Au-delà du plafond max frais compris.",
+      "etat": "Habitable en l'état",
+      "energieMin": 1800,
+      "energieMax": 1800,
+      "taxeFonciere": 2100,
+      "lienVerifieLe": "2026-10-05T08:40:00.000Z"
+    },
+    {
+      "num": 203,
+      "prio": 2,
+      "commune": "Ville Exemple",
+      "quartier": "Centre fictif",
+      "prix": 470000,
+      "surface": 140,
+      "chambres": 4,
+      "terrain": 300,
+      "dpe": "E",
+      "lien": "https://example.com/annonce-203",
+      "source": "Site Fictif",
+      "repereeLe": "2026-10-02T18:00:00.000Z",
+      "pepite": true,
+      "score": 81,
+      "resume": "Au-delà du plafond frais compris ; pépite New.",
+      "lienVerifieLe": "2026-10-05T08:40:00.000Z"
+    },
+    {
+      "num": 301,
+      "prio": 3,
+      "commune": "Ville Exemple D",
+      "quartier": "Quartier Test",
+      "prix": 329000,
+      "surface": 160,
+      "pieces": 7,
+      "chambres": 4,
+      "terrain": 380,
+      "dpe": "D",
+      "garage": true,
+      "lien": "https://example.com/annonce-301",
+      "source": "SeLoger",
+      "repereeLe": "2026-09-29T18:00:00.000Z",
+      "score": 88,
+      "resume": "Dans la cible Prio 3.",
+      "etat": "Habitable en l'état",
+      "lienVerifieLe": "2026-10-05T08:40:00.000Z"
+    },
+    {
+      "num": 302,
+      "prio": 3,
+      "commune": "Ville Exemple E",
+      "prix": 385000,
+      "surface": 125,
+      "pieces": 5,
+      "terrain": 450,
+      "lien": "https://example.com/annonce-302",
+      "source": "SeLoger",
+      "repereeLe": "2026-10-03T18:00:00.000Z",
+      "score": 66,
+      "resume": "Chambres non précisées.",
+      "lienVerifieLe": "2026-10-05T08:40:00.000Z"
+    },
+    {
+      "num": 401,
+      "prio": 4,
+      "commune": "Ville Exemple F",
+      "prix": 362000,
+      "surface": 118,
+      "pieces": 5,
+      "chambres": 3,
+      "terrain": 700,
+      "dpe": "C",
+      "lien": "https://example.com/annonce-401",
+      "source": "Les Clefs de Chez Moi",
+      "repereeLe": "2026-10-01T18:00:00.000Z",
+      "score": 74,
+      "resume": "Hors zone principale, dans la cible Prio 4.",
+      "lienVerifieLe": "2026-10-05T08:40:00.000Z"
+    },
+    {
+      "num": 111,
+      "prio": 3,
+      "commune": "Ville Fictive",
+      "prix": 339000,
+      "surface": 105,
+      "pieces": 4,
+      "chambres": 3,
+      "terrain": 200,
+      "dpe": "F",
+      "lien": "https://example.com/annonce-111",
+      "source": "Agence Exemple",
+      "repereeLe": "2026-09-10T18:00:00.000Z",
+      "score": 40,
+      "corbeille": true,
+      "corbeilleLe": "2026-10-02T08:00:00.000Z",
+      "statutLe": "2026-10-02T08:00:00.000Z",
+      "raisonCorbeille": "DPE F (test)",
+      "lienVerifieLe": "2026-10-05T08:40:00.000Z"
+    },
+    {
+      "num": 112,
+      "prio": 2,
+      "commune": "Ville Exemple C",
+      "prix": 455000,
+      "surface": 140,
+      "pieces": 6,
+      "chambres": 4,
+      "terrain": 450,
+      "dpe": "C",
+      "lien": "https://example.com/annonce-112",
+      "source": "Site Fictif",
+      "repereeLe": "2026-09-01T18:00:00.000Z",
+      "score": 55,
+      "corbeille": true,
+      "corbeilleLe": "2026-09-30T08:00:00.000Z",
+      "statutLe": "2026-09-30T08:00:00.000Z",
+      "lienVerifieLe": "2026-10-05T08:40:00.000Z"
+    },
+    {
+      "num": 199,
+      "prio": 1,
+      "commune": "Masquée",
+      "prix": 300000,
+      "masquee": true,
+      "lien": "https://example.com/annonce-199",
+      "titre": "Annonce masquée : ne doit jamais s'afficher",
+      "lienVerifieLe": "2026-10-05T08:40:00.000Z",
+      "raisonMasquee": "au-delà du plafond de 520 000 € frais compris"
+    }
+  ]
+}

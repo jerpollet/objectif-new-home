@@ -1,0 +1,10 @@
+# Le brief contient la clé d'accès : il ne doit jamais être publié.
+brief*
+Brief*
+*brief*.md
+page-actuelle-*.html
+.DS_Store
+# Handoff design et archives : à garder hors du site publié.
+design_handoff*/
+*.zip
+config.local.js
