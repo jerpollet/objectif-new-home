@@ -2,6 +2,7 @@
 
 ## V3.4.1
 - Fiche mobile en plein écran ; Partager et Fermer restent en haut pendant le défilement. Le geste « glisser vers le bas » (qui ne répondait que sur la petite poignée) est supprimé.
+- Service worker (cache `onh-v3-4-1`) : chaque fichier du site est revalidé auprès du serveur, une mise à jour n'attend plus jusqu'à 10 min de cache navigateur.
 - Listes Prio : carte de rappel en tête (zone et cible frais compris, tirées de l'onglet Réglages), au-dessus de la barre de tri.
 
 ## V3.4 (renvoi des liens analysés, liens de mail, partage)
