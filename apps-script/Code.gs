@@ -4,14 +4,14 @@
  *
  *  GET  <url>?cle=XXX  -> annonces non masquées (avec leur note) + journal + rapport + réglages + horodatage (JSON)
  *  POST <url> (corps JSON, envoyé en Content-Type text/plain pour éviter la requête préalable CORS) :
- *    {"cle":"XXX","action":"favori","num":5,"valeur":true,"par":"Prénom"}
- *    {"cle":"XXX","action":"contact","num":5,"valeur":false,"par":"Prénom"}
- *    {"cle":"XXX","action":"corbeille","num":5,"raison":"Trop de travaux","par":"Prénom"}
- *    {"cle":"XXX","action":"restaurer","num":5,"par":"Prénom"}
+ *    {"cle":"XXX","action":"favori","num":5,"valeur":true}
+ *    {"cle":"XXX","action":"contact","num":5,"valeur":false}
+ *    {"cle":"XXX","action":"corbeille","num":5,"raison":"Trop de travaux"}
+ *    {"cle":"XXX","action":"restaurer","num":5}
  *    {"cle":"XXX","action":"note","num":5,"texte":"…"}            (texte vide : note vidée)
  *    {"cle":"XXX","action":"journal","num":5,"texte":"…","par":"Prénom"}
- *  « par » est facultatif. Chaque changement de statut ajoute une ligne à l'onglet Journal (créé au besoin) ;
- *  le journal ne se modifie pas depuis le site.
+ *  Chaque changement de statut ajoute une ligne automatique (sans prénom) à l'onglet Journal, créé au besoin.
+ *  Un commentaire peut être signé : « par » (prénom) est facultatif. Le journal ne se modifie pas depuis le site.
  *    {"cle":"XXX","action":"verifierLiens","liens":["https://…","texte collé…"]}
  *    {"cle":"XXX","action":"ajouter","liens":["https://…"]}
  *  verifierLiens : état par lien (A_TRAITER, DOUBLON, IGNOREE, EN_ATTENTE, DEJA_ANALYSEE, LIEN_SUIVI, INVALIDE).
@@ -204,13 +204,12 @@ function lireRapport_() {
 }
 
 /* Onglet Réglages : colonne A le libellé, colonne B la valeur, ligne 1 d'en-tête.
- * Libellés reconnus : « Plafond », « Plafond max », « Prio N cible », « Prio N zone », « Critère » (une ligne par critère),
- * « Personne » (une ligne par prénom : choix « par » du journal sur le site).
+ * Libellés reconnus : « Plafond », « Plafond max », « Prio N cible », « Prio N zone », « Critère » (une ligne par critère).
  * Ces réglages ne sont jamais dans le dépôt public : le site les reçoit ici, avec la clé. Sans onglet, renvoie null. */
 function lireReglages_() {
   const f = SpreadsheetApp.getActive().getSheetByName(ONGLET_REGLAGES);
   if (!f || f.getLastRow() < 2) return null;
-  const r = { plafond: null, plafondMax: null, prios: {}, criteres: [], personnes: [] };
+  const r = { plafond: null, plafondMax: null, prios: {}, criteres: [] };
   f.getRange(2, 1, f.getLastRow() - 1, 2).getValues().forEach(l => {
     const lib = String(l[0] || '').trim().toLowerCase();
     const v = l[1];
@@ -223,7 +222,6 @@ function lireReglages_() {
       if (m[2] === 'cible') p.cibleMax = convertirLecture_('nombre', v);
       else p.zone = String(v).trim().slice(0, 80);
     } else if (/^crit[eè]re/.test(lib)) r.criteres.push(String(v).trim().slice(0, 60));
-    else if (/^personne/.test(lib)) r.personnes.push(String(v).trim().slice(0, 30));
   });
   return r;
 }
@@ -377,7 +375,7 @@ function changerStatut_(action, corps) {
   else if (action === 'corbeille' && !avant.corbeille) texte = 'Mise à la corbeille' + (maj.raisonCorbeille ? ' : ' + String(corps.raison).trim().slice(0, MAX_RAISON) : '');
   else if (action === 'restaurer' && avant.corbeille) texte = 'Restaurée';
   const types = { favori: 'Favori', contact: 'Contact', corbeille: 'Corbeille', restaurer: 'Restauration' };
-  if (texte) journal.push(journaliser_(num, types[action], texte, corps.par));
+  if (texte) journal.push(journaliser_(num, types[action], texte, ''));
 
   return { annonce: relireAnnonce_(L), journal: journal };
 }

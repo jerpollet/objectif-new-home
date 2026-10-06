@@ -4,7 +4,7 @@
 - Corbeille : une fenêtre de confirmation remplace le double appui. Raison facultative (texte libre et raisons rapides), envoyée à l'API (`corbeille` + `raison`, colonne « Raison corbeille », 500 caractères au plus). Dans la vue Corbeille, la raison a sa propre ligne (colonne « Raison » sur ordinateur).
 - Note : de retour dans la fiche (toutes les vues), mémo partagé enregistré par bouton ou à la perte du focus (`note`). « Vider » demande confirmation.
 - Journal de suivi : nouvel onglet « Journal » (Date, N°, Par, Type, Texte), créé par l'API au premier événement. Chaque changement de statut fait depuis le site y ajoute une ligne (seulement s'il change vraiment) ; commentaires ajoutés depuis la fiche (`journal`). Rien ne se modifie ni ne se supprime depuis le site. Affiché uniquement dans la vue Suivi : dernière entrée sur la carte, fil complet dans la fiche (5 dernières, « Afficher les plus anciennes »).
-- Auteur : prénoms lus dans l'onglet Réglages (lignes « Personne »), choisis une fois par appareil, envoyés en `par`. Aucun prénom dans le dépôt.
+- Auteur : les lignes automatiques ne sont pas signées. Un commentaire a un champ « Prénom (facultatif) », envoyé en `par` ; le dernier prénom saisi est proposé sur l'appareil. Aucun prénom dans le dépôt.
 - Saisie protégée : pendant qu'on écrit (note, journal, raison) ou qu'on appuie sur un bouton, la relecture automatique attend, le texte et le clavier restent en place.
 - API : `lire` renvoie aussi `notes` et `journal` (1 000 dernières entrées) ; `changerStatut_` renvoie `{annonce, journal}`. Compatible avec le site V3.4 (il ignore les nouveaux champs).
 - Service worker : cache `onh-v3-5`.

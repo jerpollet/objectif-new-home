@@ -3,11 +3,11 @@
   var CONFIG = window.CONFIG || {};
   var PROD = location.origin === CONFIG.ORIGINE_PROD;
   var MODE_TEST = CONFIG.MODE_TEST === true || (!PROD && /[?&]test=1(&|$)/.test(location.search));
-  var LS_CLE = "onh-cle", LS_CACHE = MODE_TEST ? "onh-cache-test" : "onh-cache-v3", LS_UI = "onh-ui", LS_API = "onh-api-test", LS_MOI = "onh-moi";
+  var LS_CLE = "onh-cle", LS_CACHE = MODE_TEST ? "onh-cache-test" : "onh-cache-v3", LS_UI = "onh-ui", LS_API = "onh-api-test", LS_PRENOM = "onh-prenom";
   var DELAI_MAX = 25000, DELAI_RELECTURE = 30000, JOUR = 864e5;
   var NOTAIRE = 0.075, MAX_COMPARER = 3;
   /* Plafonds, cibles par Prio et critères : servis par l'API avec la clé (onglet Réglages), jamais dans le dépôt. */
-  var PRIOS = {}, PLAFOND = null, PLAFOND_MAX = null, CRITERES = [], PERSONNES = [];
+  var PRIOS = {}, PLAFOND = null, PLAFOND_MAX = null, CRITERES = [];
   var MAX_NOTE = 2000, MAX_RAISON = 500, JOURNAL_VISIBLE = 5;
   var RAISONS_RAPIDES = ["Trop cher", "Trop de travaux", "Pas de jardin", "Mauvais quartier", "Déjà vendue"];
   var TRIS = [
@@ -352,7 +352,7 @@
         d.journal = d.journal || [];
         function journaliser(type, texte){
           var e = {le:new Date().toISOString(), num:a.num, type:type, texte:texte};
-          if (txt(c.par)) e.par = txt(c.par);
+          if (type === "Commentaire" && txt(c.par)) e.par = txt(c.par);
           d.journal.push(e); return e;
         }
         if (c.action === "note"){
@@ -462,7 +462,6 @@
     PLAFOND_MAX = estNb(g.plafondMax) ? g.plafondMax : PLAFOND;
     PRIOS = g.prios && typeof g.prios === "object" ? g.prios : {};
     CRITERES = Array.isArray(g.criteres) ? g.criteres.map(txt).filter(Boolean) : [];
-    PERSONNES = Array.isArray(g.personnes) ? g.personnes.map(txt).filter(Boolean) : [];
   }
   function charger(force){
     if (S.chargement || (!MODE_TEST && !S.cle)) return;
@@ -529,7 +528,6 @@
     var corps = {action:action, num:num};
     if (action === "favori" || action === "contact") corps.valeur = !!valeur;
     if (action === "corbeille" && raison) corps.raison = raison;
-    if (moi()) corps.par = moi();
     S.files[num] = (S.files[num] || Promise.resolve()).then(function(){
       return ecrire(corps).then(function(r){
         S.ops[num]--;
@@ -573,18 +571,8 @@
   }
   function fermerDialogue(){ if (!S.dialogue) return; S.dialogue = null; rendre(true); }
 
-  /* ---------- Auteur des écritures (prénoms de l'onglet Réglages, choisis une fois par appareil) ---------- */
-  function moi(){
-    var m = txt(lsGet(LS_MOI));
-    return m && (!PERSONNES.length || PERSONNES.indexOf(m) >= 0) ? m : null;
-  }
-  function choixMoi(){
-    if (!PERSONNES.length) return null;
-    var m = moi();
-    return el("div", {classe:"choix-moi", role:"group", "aria-label":"Qui écrit ?"}, [el("span", {texte:"Vous êtes"})].concat(PERSONNES.map(function(p){
-      return el("button", {type:"button", classe:"puce", "aria-pressed":m === p ? "true" : "false", onclick:function(){ lsSet(LS_MOI, p); rendre(true); }}, [p]);
-    })));
-  }
+  /* Prénom facultatif des commentaires du journal : le dernier utilisé est proposé sur cet appareil. */
+  function prenom(){ var b = S.brouillons.prenom; return txt(b !== undefined ? b : lsGet(LS_PRENOM)).slice(0, 30); }
 
   /* ---------- Note (mémo libre, une par annonce) ---------- */
   function cleNote(a){ return "note-" + a.num; }
@@ -664,9 +652,11 @@
   function envoyerCommentaire(a, zone){
     var k = "journal-" + a.num, texte = txt(zone ? zone.value : S.brouillons[k]).slice(0, MAX_NOTE);
     if (!texte) return;
-    if (PERSONNES.length && !moi()){ message("Choisissez d'abord qui écrit.", "erreur"); return; }
     var e = {num:a.num, le:new Date().toISOString(), type:"Commentaire", texte:texte, local:true};
-    if (moi()) e.par = moi();
+    var p = prenom();
+    if (p) e.par = p;
+    if (p) lsSet(LS_PRENOM, p); else lsDel(LS_PRENOM);
+    delete S.brouillons.prenom;
     D.journal.push(e);
     delete S.brouillons[k];
     if (zone) zone.blur();
@@ -717,12 +707,17 @@
     var bouton = el("button", {type:"button", classe:"btn btn-accent btn-petit", disabled:!txt(zone.value), onclick:function(){ envoyerCommentaire(a, zone); }}, [ico("envoyer"), el("span", {texte:"Ajouter"})]);
     zone.addEventListener("input", function(){ S.brouillons[k] = zone.value; bouton.disabled = !txt(zone.value); });
     zone.addEventListener("keydown", function(ev){ if (ev.key === "Enter" && (ev.metaKey || ev.ctrlKey)){ ev.preventDefault(); envoyerCommentaire(a, zone); } });
+    var champPrenom = el("input", {type:"text", classe:"j-prenom", maxlength:"30", autocomplete:"given-name", "data-saisie":"prenom",
+      placeholder:"Prénom (facultatif)", "aria-label":"Prénom (facultatif)"});
+    champPrenom.value = prenom();
+    champPrenom.addEventListener("input", function(){ S.brouillons.prenom = champPrenom.value; });
+    champPrenom.addEventListener("keydown", function(ev){ if (ev.key === "Enter"){ ev.preventDefault(); envoyerCommentaire(a, zone); } });
     return el("section", {classe:"fiche-sec journal"}, [
       el("h3", {classe:"surtitre-sec"}, [ico("historique"), " Journal de suivi"]),
       l.length ? null : el("p", {classe:"j-vide", texte:"Rien pour l'instant. Les changements de statut s'y ajoutent tout seuls."}),
       caches ? el("button", {type:"button", classe:"lien-txt j-plus", onclick:function(){ S.journalTout[a.num] = true; rendre(true); }}, ["Afficher " + pluriel(caches, "entrée plus ancienne", "entrées plus anciennes")]) : null,
       l.length ? el("ol", {classe:"j-fil"}, l.slice(caches).map(entreeJournal)) : null,
-      el("div", {classe:"j-saisie"}, [choixMoi(), zone, el("div", {classe:"j-saisie-bas"}, [el("small", {classe:"gris", texte:moi() ? "En tant que " + moi() : ""}), bouton])])
+      el("div", {classe:"j-saisie"}, [zone, el("div", {classe:"j-saisie-bas"}, [champPrenom, bouton])])
     ]);
   }
   function basculerComparer(num){

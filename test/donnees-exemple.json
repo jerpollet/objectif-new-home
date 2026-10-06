@@ -38,10 +38,6 @@
       "Critère fictif 1",
       "Critère fictif 2",
       "Critère fictif 3"
-    ],
-    "personnes": [
-      "Personne A",
-      "Personne B"
     ]
   },
   "ajouts": [
@@ -348,14 +344,12 @@
     {
       "le": "2026-10-01T09:00:00.000Z",
       "num": 101,
-      "par": "Personne A",
       "type": "Favori",
       "texte": "Ajoutée aux favoris"
     },
     {
       "le": "2026-10-03T08:00:00.000Z",
       "num": 101,
-      "par": "Personne B",
       "type": "Contact",
       "texte": "Passée en contact"
     },
