@@ -1117,21 +1117,22 @@
 
   /* ---------- Ajouter des annonces ---------- */
   var RE_LIEN = /(?:https?:\/\/|www\.)[^\s<>"«»]+|\b(?:[a-z0-9-]+\.)+[a-z]{2,}\/[^\s<>"«»]*/gi;
-  /* Un lien par ligne ou en vrac ; une ligne sans lien est gardée telle quelle (elle sera INVALIDE). */
+  /* Un lien par ligne ou en vrac. Dès qu'il y a au moins un lien, les lignes sans lien (titre, « J'ai trouvé une annonce… »
+     ajoutés par les applis au partage) sont ignorées ; sans aucun lien, le texte est gardé et ressort INVALIDE. */
   function extraireEntrees(texte){
-    var res = [], vus = {};
-    function ajouter(e){ if (e && !vus[e]){ vus[e] = true; res.push(e); } }
+    var liens = [], autres = [], vus = {};
+    function ajouter(l, e){ if (e && !vus[e]){ vus[e] = true; l.push(e); } }
     String(texte || "").split(/\r?\n/).forEach(function(l){
       l = l.trim(); if (!l) return;
       var m = l.match(RE_LIEN);
-      if (!m) { ajouter(l.slice(0, 300)); return; }
+      if (!m) { ajouter(autres, l.slice(0, 300)); return; }
       m.forEach(function(u){
         u = u.replace(/[)\].,;:!?'»"]+$/, "");
         if (!/^https?:\/\//i.test(u)) u = "https://" + u;
-        ajouter(u);
+        ajouter(liens, u);
       });
     });
-    return res;
+    return liens.length ? liens : autres;
   }
   /* Libellé tiré uniquement de l'adresse : le navigateur ne peut pas lire la page de l'annonce. */
   function libelleAdresse(u){
@@ -1557,8 +1558,10 @@
     var adr = lireAdresse();
     try { history.replaceState(null, "", location.pathname + (reste.length ? "?" + reste.join("&") : "") + "#ajouter" + (adr.cle ? "&cle=" + encodeURIComponent(adr.cle) : "")); } catch(e){}
     /* 2. Texte ajouté à la suite d'une saisie éventuelle. */
-    var t = morceaux.join("\n");
+    /* Seuls les liens vont dans la zone ; un partage sans lien garde son texte (il ressortira INVALIDE). */
+    var t = morceaux.join("\n"), liens = extraireEntrees(t);
     if (!t) return null;
+    if (new RegExp(RE_LIEN.source, "i").test(t)) t = liens.join("\n");
     S.ajout.texte = (S.ajout.texte.trim() ? S.ajout.texte.replace(/\s+$/, "") + "\n" : "") + t;
     S.ajout.resultats = null; S.ajout.coches = {}; S.ajout.fait = null;
     return t;

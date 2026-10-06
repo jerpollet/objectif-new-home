@@ -6,6 +6,7 @@
 - Partage Android vers le site (Web Share Target, `share_target` du manifeste) : « Partager » → « New Home » ouvre Ajouter avec le texte reçu, adresse nettoyée, vérification lancée si la clé est connue, jamais d'envoi automatique. Sans clé : message sur la page Ajouter, texte gardé.
 - Bouton « Partager » sur les cartes (vue Cartes) et dans la fiche : texte « Annonce n°… · lieu · surface · prix », lien de fiche sans la clé d'accès, lien de l'annonce. Repli presse-papier (« Copié »). Pas de bouton pour une annonce en corbeille. Contrôle en mode test : `onhTests.partage()` dans la console.
 - Fiche ouverte par un lien direct : message clair (annonce introuvable ou masquée, appareil sans clé, tableau injoignable) au lieu d'une redirection silencieuse.
+- Ajouter : dès qu'un texte contient au moins un lien, les lignes sans lien (titre, « J'ai trouvé une annonce… » ajoutés par les applis au partage) sont ignorées ; un partage reçu ne met que ses liens dans la zone. Un texte sans aucun lien ressort toujours « Invalide ».
 - Service worker : cache `onh-v3-4` ; une navigation avec paramètres (partage reçu) est rangée sous l'adresse sans paramètres.
 
 ## V3.3
