@@ -8,3 +8,7 @@ page-actuelle-*.html
 design_handoff*/
 *.zip
 config.local.js
+
+# Dossiers de design (handoff) : jamais publiés
+*.zip
+design_handoff*/

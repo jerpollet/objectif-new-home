@@ -1,5 +1,15 @@
 # Changelog
 
+## V3.6 (favori à deux, onglet Favoris, accueil réordonné)
+- Favori à deux : la colonne « Favori » est remplacée par « Favori Jérémy » et « Favori Line » (migration `migrerFavoris()` : chaque Favori = Oui devient Oui dans les deux, sans ligne de journal ; l'ancienne colonne reste, ignorée). API : `lire` renvoie `favoriJeremy` / `favoriLine` ; l'action `favori` exige `qui` (`jeremy` | `line`) ; journal « Ajoutée aux favoris de Jérémy / Line » seulement si l'état change ; la corbeille vide les deux. En-têtes comparés sans accents ni casse.
+- Cœur : pastille inchangée, initiales J (encre) / L (accent) dessous ; tag « Coup de cœur » avant Pépite et New quand les deux aiment. Même logique en liste, tableau, fiche, pépites et comparateur (`♥ J · L`).
+- « Qui l'aime ? » : le cœur ouvre une feuille du bas (mobile : poignée, zone de prise pleine largeur × 28 px, glisser vers le bas, voile, ✕, Fermer et bouton retour ferment) ou un menu de 280 px accroché au cœur (ordinateur : Échap, clic dehors, défilement ferment ; focus piégé). Deux interrupteurs, écriture immédiate et optimiste. Bandeau « Coup de cœur commun » seulement quand les deux sont actifs.
+- Onglet Favoris (`#favoris`) : menu burger après Accueil (compteur + pilule des coups de cœur), en-tête desktop avant Suivi. Filtres Tous · J & L · J · L avec compteurs (mémorisés), toujours en cartes par adéquation ; « Tous » groupé (Coups de cœur, Jérémy, Line ; sur ordinateur « Jérémy seul · Line seule »). Cartes horizontales compactes sur ordinateur ; fiche en tiroir.
+- Accueil : Pépites → Dernière veille (stats + résumé repliable, fermé par défaut, état mémorisé) → Par prio → Nos critères. Ordinateur : bandes pleine largeur (fin de `.grille-accueil`), pépites en 16:9.
+- En-tête desktop sur une ligne : nowrap et marges resserrées ; entre 1024 et 1279 px, le bouton devient « + Ajouter ».
+- Une couche déjà ouverte ne rejoue plus son animation d'entrée à chaque rendu.
+- Service worker : cache `onh-v3-6`.
+
 ## V3.5 (corbeille avec raison, note, journal de suivi)
 - Corbeille : une fenêtre de confirmation remplace le double appui. Raison facultative (texte libre et raisons rapides), envoyée à l'API (`corbeille` + `raison`, colonne « Raison corbeille », 500 caractères au plus). Dans la vue Corbeille, la raison a sa propre ligne (colonne « Raison » sur ordinateur).
 - Note : de retour dans la fiche (toutes les vues), mémo partagé enregistré par bouton ou à la perte du focus (`note`). « Vider » demande confirmation.

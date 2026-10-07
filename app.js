@@ -16,7 +16,7 @@
     {id:"prixDesc", nom:"Prix décroissant", court:"Prix ↓"},
     {id:"recent", nom:"Plus récentes", court:"Récentes"}
   ];
-  var CHAMPS_STATUT = ["favori", "enContact", "enContactDepuis", "corbeille", "corbeilleLe", "statutLe", "raisonCorbeille"];
+  var CHAMPS_STATUT = ["favoriJeremy", "favoriLine", "enContact", "enContactDepuis", "corbeille", "corbeilleLe", "statutLe", "raisonCorbeille"];
   /* Champs gardés en local pendant une écriture en cours (mise à jour optimiste). */
   var CHAMPS_LOCAUX = CHAMPS_STATUT.concat(["notes"]);
   var API_TEST = /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/;
@@ -54,6 +54,7 @@
     retour:'<path d="m15 18-6-6 6-6"/>',
     fleche:'<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
     gauche:'<path d="M19 12H5"/><path d="m12 19-7-7 7-7"/>',
+    chevron:'<path d="m6 9 6 6 6-6"/>',
     message:'<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
     historique:'<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
     crayon:'<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
@@ -156,7 +157,8 @@
     ajout:{texte:"", resultats:null, coches:{}, verif:false, envoi:false, fait:null}
   };
   var D = null;
-  var UI = {viewMode:"cards", sort:"pertinence", favoris:false, nouveau:false, compareIds:[], prio:1};
+  var UI = {viewMode:"cards", sort:"pertinence", favoris:false, nouveau:false, compareIds:[], prio:1, favFiltre:"tous", resumeOuvert:false};
+  var FILTRES_FAV = ["tous", "jl", "j", "l"];
   (function(){
     try {
       var u = JSON.parse(lsGet(LS_UI) || "{}");
@@ -165,16 +167,32 @@
       UI.favoris = u.favoris === true; UI.nouveau = u["new"] === true;
       if (Array.isArray(u.compareIds)) UI.compareIds = u.compareIds.filter(estNb).slice(0, MAX_COMPARER);
       if ([1,2,3,4].indexOf(u.prio) >= 0) UI.prio = u.prio;
+      if (FILTRES_FAV.indexOf(u.favFiltre) >= 0) UI.favFiltre = u.favFiltre;
+      UI.resumeOuvert = u.resumeOuvert === true;
     } catch(e){}
   })();
   function sauverUI(){
-    lsSet(LS_UI, JSON.stringify({viewMode:UI.viewMode, sort:UI.sort, favoris:UI.favoris, "new":UI.nouveau, compareIds:UI.compareIds, prio:UI.prio}));
+    lsSet(LS_UI, JSON.stringify({viewMode:UI.viewMode, sort:UI.sort, favoris:UI.favoris, "new":UI.nouveau, compareIds:UI.compareIds, prio:UI.prio,
+      favFiltre:UI.favFiltre, resumeOuvert:UI.resumeOuvert}));
   }
 
+  /* Favori à deux (V3.6) : une colonne par personne ; les deux = coup de cœur. */
+  var PERSONNES = [{id:"jeremy", cle:"favoriJeremy", nom:"Jérémy", init:"J"}, {id:"line", cle:"favoriLine", nom:"Line", init:"L"}];
+  function aimeJ(a){ return a.favoriJeremy === true; }
+  function aimeL(a){ return a.favoriLine === true; }
+  function estFavori(a){ return aimeJ(a) || aimeL(a); }
+  function estCoupDeCoeur(a){ return aimeJ(a) && aimeL(a); }
+  function aimeePar(a){
+    var n = PERSONNES.filter(function(p){ return a[p.cle] === true; }).map(function(p){ return p.nom; });
+    return n.length ? "Aimée par " + n.join(" et ") : "";
+  }
   function annonces(){ return D ? D.annonces.filter(function(a){ return !a.masquee; }) : []; }
   function enLice(){ return annonces().filter(function(a){ return !a.corbeille; }); }
   function parPrio(n){ return enLice().filter(function(a){ return a.prio === n; }); }
   function suivis(){ return enLice().filter(function(a){ return a.enContact; }); }
+  /* Favoris : rangés par adéquation, puis par n°. */
+  function parAdequation(x, y){ return comparerNb(x.score, y.score, true) || x.num - y.num; }
+  function favoris(){ return enLice().filter(estFavori).sort(parAdequation); }
   function dansCorbeille(){
     return annonces().filter(function(a){ return a.corbeille; }).sort(function(x, y){
       return txt(y.corbeilleLe || y.statutLe).localeCompare(txt(x.corbeilleLe || x.statutLe));
@@ -186,7 +204,7 @@
     return null;
   }
   function filtrer(l, avecNew){
-    if (UI.favoris) l = l.filter(function(a){ return a.favori; });
+    if (UI.favoris) l = l.filter(estFavori);
     if (avecNew && UI.nouveau) l = l.filter(estNew);
     return l;
   }
@@ -365,11 +383,13 @@
         }
         /* Même règle que changerStatut_ (Code.gs) : une ligne de journal seulement si le statut change. */
         var t = null;
-        if (c.action === "favori" && !!c.valeur !== !!a.favori) t = ["Favori", c.valeur ? "Ajoutée aux favoris" : "Retirée des favoris"];
+        var pf = PERSONNES.filter(function(x){ return x.id === c.qui; })[0];
+        if (c.action === "favori" && !pf) return test.attendre().then(function(){ throw erreur("Paramètre « qui » manquant ou inconnu (jeremy ou line)."); });
+        if (c.action === "favori" && !!c.valeur !== (a[pf.cle] === true)) t = ["Favori", (c.valeur ? "Ajoutée aux favoris de " : "Retirée des favoris de ") + pf.nom];
         else if (c.action === "contact" && !!c.valeur !== !!a.enContact) t = ["Contact", c.valeur ? "Passée en contact" : "Retirée du suivi"];
         else if (c.action === "corbeille" && !a.corbeille) t = ["Corbeille", "Mise à la corbeille" + (txt(c.raison) ? " : " + txt(c.raison) : "")];
         else if (c.action === "restaurer" && a.corbeille) t = ["Restauration", "Restaurée"];
-        appliquerStatut(a, c.action, c.valeur, new Date().toISOString());
+        appliquerStatut(a, c.action, c.valeur, new Date().toISOString(), c.qui);
         if (c.action === "corbeille" && txt(c.raison)) a.raisonCorbeille = txt(c.raison);
         return test.attendre({ok:true, annonce:test.copie(a), journal:t ? [test.copie(journaliser(t[0], t[1]))] : []});
       });
@@ -393,7 +413,7 @@
     var m;
     if ((m = t.match(/^prio\/?([1-4])$/))) return {nom:"prio", n:Number(m[1])};
     if ((m = t.match(/^fiche\/(\d+)$/))) return {nom:"fiche", num:Number(m[1])};
-    if (/^(suivi|comparer|ajouter|corbeille)$/.test(t)) return {nom:t};
+    if (/^(favoris|suivi|comparer|ajouter|corbeille)$/.test(t)) return {nom:t};
     return {nom:"accueil"};
   }
   function texteRoute(r){
@@ -501,24 +521,26 @@
   }
 
   /* ---------- Écritures (optimistes) ---------- */
-  function appliquerStatut(a, action, valeur, maintenant){
-    if (action === "favori") a.favori = !!valeur;
+  function appliquerStatut(a, action, valeur, maintenant, qui){
+    if (action === "favori"){ PERSONNES.forEach(function(p){ if (p.id === qui) a[p.cle] = !!valeur; }); }
     else if (action === "contact"){
       a.enContact = !!valeur;
       if (valeur){ if (!a.enContactDepuis) a.enContactDepuis = maintenant; }
       else delete a.enContactDepuis;
     } else if (action === "corbeille"){
       if (!a.corbeille) a.corbeilleLe = maintenant;
-      a.corbeille = true; a.favori = false; a.enContact = false; delete a.enContactDepuis;
+      a.corbeille = true; a.favoriJeremy = false; a.favoriLine = false; a.enContact = false; delete a.enContactDepuis;
     } else if (action === "restaurer"){
       a.corbeille = false; delete a.corbeilleLe; delete a.raisonCorbeille;
     }
     a.statutLe = maintenant;
   }
-  function changerStatut(a, action, valeur, apres, raison){
-    var num = a.num, avant = {};
+  /* extra : {raison} pour la corbeille, {qui:"jeremy"|"line"} pour un favori. */
+  function changerStatut(a, action, valeur, apres, extra){
+    extra = extra || {};
+    var raison = extra.raison, num = a.num, avant = {};
     CHAMPS_STATUT.forEach(function(k){ if (k in a) avant[k] = a[k]; });
-    appliquerStatut(a, action, valeur, new Date().toISOString());
+    appliquerStatut(a, action, valeur, new Date().toISOString(), extra.qui);
     if (action === "corbeille" && raison) a.raisonCorbeille = raison;
     if (action === "corbeille") nettoyerComparer();
     S.ops[num] = (S.ops[num] || 0) + 1;
@@ -527,6 +549,7 @@
     /* Une file par annonce : deux appuis rapides partent dans l'ordre. */
     var corps = {action:action, num:num};
     if (action === "favori" || action === "contact") corps.valeur = !!valeur;
+    if (action === "favori") corps.qui = extra.qui;
     if (action === "corbeille" && raison) corps.raison = raison;
     S.files[num] = (S.files[num] || Promise.resolve()).then(function(){
       return ecrire(corps).then(function(r){
@@ -550,13 +573,14 @@
       });
     });
   }
-  function basculerFavori(a){ if (!a.corbeille) changerStatut(a, "favori", !a.favori); }
+  /* « Qui l'aime ? » : chaque interrupteur écrit tout de suite (optimiste, même file par annonce). */
+  function basculerFavoriDe(a, p){ if (!a.corbeille) changerStatut(a, "favori", a[p.cle] !== true, null, {qui:p.id}); }
   function basculerContact(a){ if (!a.corbeille) changerStatut(a, "contact", !a.enContact); }
   function mettreCorbeille(a, raison){
     changerStatut(a, "corbeille", true, function(){
       if (S.route.nom === "fiche" && S.route.num === a.num) fermerFiche();
       message("Mise à la corbeille");
-    }, raison);
+    }, {raison:raison});
   }
   function restaurer(a){ changerStatut(a, "restaurer", true, function(){ message("Restaurée dans la Prio " + a.prio); }); }
   /* Corbeille : fenêtre de confirmation, avec une raison facultative (colonne « Raison corbeille »). */
@@ -573,6 +597,108 @@
 
   /* Prénom facultatif des commentaires du journal : le dernier utilisé est proposé sur cet appareil. */
   function prenom(){ var b = S.brouillons.prenom; return txt(b !== undefined ? b : lsGet(LS_PRENOM)).slice(0, 30); }
+
+  /* ---------- « Qui l'aime ? » : feuille du bas (mobile) ou menu accroché au cœur (ordinateur) ---------- */
+  function ouvrirQuiAime(a, ancre){
+    if (a.corbeille) return;
+    var r = ancre && ancre.getBoundingClientRect ? ancre.getBoundingClientRect() : null;
+    S.quiAime = {num:a.num, ancre:r ? {top:r.top, bottom:r.bottom, left:r.left, right:r.right} : null};
+    /* Mobile : le bouton retour du téléphone ferme la feuille. */
+    if (!S.bureau){ try { history.pushState({quiAime:true}, "", location.href); S.quiAimeHist = true; } catch(e){} }
+    rendre(true);
+    setTimeout(function(){ var b = document.querySelector(".qui-aime .interrupteur"); if (b && S.bureau) b.focus(); }, 30);
+  }
+  function fermerQuiAime(){
+    if (!S.quiAime) return;
+    S.quiAime = null;
+    if (S.quiAimeHist){ S.quiAimeHist = false; S.ignorerPop = true; history.back(); }
+    rendre(true);
+  }
+  /* Ordinateur : le menu est accroché au cœur ; si la page défile, il se ferme. */
+  document.addEventListener("scroll", function(e){ if (S.quiAime && S.bureau && !(e.target.closest && e.target.closest(".qui-aime"))) fermerQuiAime(); }, {passive:true, capture:true});
+  window.addEventListener("popstate", function(){
+    if (S.ignorerPop){ S.ignorerPop = false; return; }
+    if (S.quiAime){ S.quiAime = null; S.quiAimeHist = false; rendre(true); }
+  });
+  function lignesQuiAime(a){
+    return PERSONNES.map(function(p){
+      var on = a[p.cle] === true;
+      return el("button", {type:"button", classe:"qa-ligne interrupteur", role:"switch", "aria-checked":on ? "true" : "false",
+        onclick:function(){ if (S.quiAime) S.quiAime.focus = PERSONNES.indexOf(p); basculerFavoriDe(a, p); }}, [
+        el("span", {classe:"pastille pastille-" + p.id, "aria-hidden":"true", texte:p.init}),
+        el("span", {classe:"qa-nom", texte:p.nom}),
+        el("span", {classe:"switch" + (on ? " on" : ""), "aria-hidden":"true"}, [el("span", {classe:"switch-curseur"}, [ico("heart", true)])])
+      ]);
+    });
+  }
+  function bandeauCoupDeCoeur(court){
+    return el("div", {classe:"qa-cdc", role:"status"}, [ico("heart", true), el("div", null, [
+      el("b", {texte:"Coup de cœur commun"}),
+      el("span", {texte:court ? "Elle passe en tête des Favoris." : "Vous l'aimez tous les deux : elle passe en tête des Favoris."})
+    ])]);
+  }
+  function quiAime(){
+    var q = S.quiAime, a = q ? trouver(q.num) : null;
+    if (!q) return null;
+    if (!a || a.corbeille){ S.quiAime = null; return null; }
+    var contenu = [
+      el("div", {classe:"qa-tete"}, [el("h2", {texte:"Qui l'aime ?"}), el("button", {type:"button", classe:"btn-ico", "aria-label":"Fermer", onclick:fermerQuiAime}, [ico("x")])]),
+      el("div", {classe:"qa-lignes"}, lignesQuiAime(a)),
+      estCoupDeCoeur(a) ? bandeauCoupDeCoeur(S.bureau) : null
+    ];
+    if (S.bureau){
+      var menu = el("div", {classe:"qui-aime qa-menu", role:"dialog", "aria-modal":"true", "aria-label":"Qui l'aime ?"}, contenu);
+      /* Sous le cœur, aligné sur son bord droit ; au-dessus s'il manque de place en bas. */
+      var r = q.ancre || {top:80, bottom:80, left:0, right:window.innerWidth - 20}, l = 280, h = estCoupDeCoeur(a) ? 236 : 168;
+      /* Aligné sur le bord droit du cœur ; s'il n'y a pas la place à gauche, sur son bord gauche. */
+      var left = r.right - l >= 8 ? r.right - l : r.left;
+      left = Math.max(8, Math.min(window.innerWidth - l - 8, left));
+      var haut = r.bottom + 8 + h > window.innerHeight - 8 ? Math.max(8, r.top - 8 - h) : r.bottom + 8;
+      menu.style.left = left + "px"; menu.style.top = haut + "px";
+      menu.addEventListener("keydown", pieger);
+      return el("div", {classe:"couche couche-qa-menu"}, [el("div", {classe:"voile voile-transparent", onclick:fermerQuiAime}), menu]);
+    }
+    var feuille = el("div", {classe:"feuille qui-aime", role:"dialog", "aria-modal":"true", "aria-label":"Qui l'aime ?"}, [
+      el("div", {classe:"poignee", "aria-hidden":"true"}, [el("span")])
+    ].concat(contenu).concat([
+      el("div", {classe:"feuille-pied"}, [el("button", {type:"button", classe:"btn btn-large qa-fermer", onclick:fermerQuiAime}, ["Fermer"])])
+    ]));
+    glisserPourFermer(feuille.firstChild, feuille);
+    return el("div", {classe:"couche couche-qa"}, [el("div", {classe:"voile", onclick:fermerQuiAime}), feuille]);
+  }
+  /* Focus gardé dans le menu : Tab passe d'un bouton à l'autre. */
+  function pieger(e){
+    if (e.key !== "Tab") return;
+    var f = Array.prototype.slice.call(e.currentTarget.querySelectorAll("button"));
+    if (!f.length) return;
+    var i = f.indexOf(document.activeElement), j = e.shiftKey ? (i <= 0 ? f.length - 1 : i - 1) : (i + 1) % f.length;
+    e.preventDefault(); f[j].focus();
+  }
+  /* Glisser vers le bas : la zone de prise fait toute la largeur de la feuille sur 28 px.
+     Ferme au-delà de 60 px ou avec un geste rapide, sinon la feuille revient en place. */
+  function glisserPourFermer(zone, feuille){
+    var y0 = null, t0 = 0, dy = 0;
+    zone.addEventListener("pointerdown", function(e){
+      y0 = e.clientY; t0 = Date.now(); dy = 0;
+      try { zone.setPointerCapture(e.pointerId); } catch(x){}
+      feuille.style.transition = "none";
+    });
+    zone.addEventListener("pointermove", function(e){
+      if (y0 === null) return;
+      dy = Math.max(0, e.clientY - y0);
+      feuille.style.transform = "translateY(" + dy + "px)";
+    });
+    function fin(){
+      if (y0 === null) return;
+      var v = dy / Math.max(1, Date.now() - t0);
+      y0 = null;
+      feuille.style.transition = "transform .18s ease";
+      if (dy > 60 || (v > 0.6 && dy > 12)){ feuille.style.transform = "translateY(100%)"; setTimeout(fermerQuiAime, 160); }
+      else feuille.style.transform = "";
+    }
+    zone.addEventListener("pointerup", fin);
+    zone.addEventListener("pointercancel", fin);
+  }
 
   /* ---------- Note (mémo libre, une par annonce) ---------- */
   function cleNote(a){ return "note-" + a.num; }
@@ -730,9 +856,17 @@
   /* ---------- Briques d'affichage ---------- */
   function tags(a){
     var t = [];
+    if (estCoupDeCoeur(a)) t.push(tagCoupDeCoeur());
     if (a.pepite) t.push(el("span", {classe:"tag tag-pepite", texte:"Pépite"}));
     if (estNew(a)) t.push(el("span", {classe:"tag tag-new", texte:"New"}));
     return t.length ? el("div", {classe:"tags"}, t) : null;
+  }
+  function tagCoupDeCoeur(){ return el("span", {classe:"tag tag-cdc", texte:"Coup de cœur"}); }
+  /* Initiales J / L sous le cœur (J fond encre, L fond accent). */
+  function initiales(a){
+    var l = PERSONNES.filter(function(p){ return a[p.cle] === true; });
+    if (!l.length) return null;
+    return el("span", {classe:"initiales", "aria-hidden":"true"}, l.map(function(p){ return el("span", {classe:"ini ini-" + p.id, texte:p.init}); }));
   }
   function repli(){ return el("div", {classe:"repli"}, [ico("maison"), el("span", {texte:"Sans photo"})]); }
   function image(a, o){
@@ -750,13 +884,14 @@
     if (o.tags !== false){ var t = tags(a); if (t) box.appendChild(t); }
     if (o.coeur) box.appendChild(coeur(a, "coeur-boite"));
     if (o.partage){ var bp = boutonPartager(a, "coeur partage-boite"); if (bp) box.appendChild(bp); }
-    if (o.coeurIndic && a.favori) box.appendChild(el("span", {classe:"coeur-boite indic", "aria-label":"Favori"}, [ico("heart", true)]));
+    if (o.coeurIndic && estFavori(a)) box.appendChild(el("span", {classe:"coeur-boite indic", "aria-label":aimeePar(a)}, [ico("heart", true), initiales(a)]));
     return box;
   }
   function coeur(a, classe){
-    return el("button", {type:"button", classe:"coeur" + (classe ? " " + classe : "") + (a.favori ? " actif" : ""), "aria-pressed":a.favori ? "true" : "false",
-      "aria-label":(a.favori ? "Retirer des favoris" : "Ajouter aux favoris") + ", annonce n°" + a.num, disabled:a.corbeille,
-      onclick:function(e){ e.stopPropagation(); basculerFavori(a); }}, [ico("heart", a.favori)]);
+    var f = estFavori(a);
+    return el("button", {type:"button", classe:"coeur" + (classe ? " " + classe : "") + (f ? " actif" : ""), "aria-haspopup":"dialog",
+      "aria-label":"Qui l'aime ? Annonce n°" + a.num + (f ? ", " + aimeePar(a).toLowerCase() : ", personne pour l'instant"), disabled:a.corbeille,
+      onclick:function(e){ e.stopPropagation(); ouvrirQuiAime(a, this); }}, [ico("heart", f), initiales(a)]);
   }
   /* ---------- Partager une annonce ---------- */
   /* Lien de fiche SANS la clé d'accès : le message part dans WhatsApp ou un SMS. Ne pas utiliser hashPour(). */
@@ -854,6 +989,29 @@
         lienAnnonce(a, "act-annonce", [S.bureau ? "Voir l'annonce ↗" : "Annonce ↗"])
       ]));
     }
+    return cliquable(art, a.num);
+  }
+  /* Carte de l'onglet Favoris : pas d'évaluation ni de case Comparer, une ligne « Aimée par… ». */
+  function carteFavori(a){
+    var m2 = prixM2(a), cdc = estCoupDeCoeur(a);
+    var corps = S.bureau
+      ? el("div", {classe:"carte-corps"}, [
+          el("div", {classe:"carte-meta"}, [badgePrio(a), cdc ? tagCoupDeCoeur() : null]),
+          el("div", {classe:"carte-prix", texte:estNb(a.prix) ? euros(a.prix) : "Prix non précisé"}),
+          el("div", {classe:"carte-lieu"}, [el("b", {texte:lieu(a)})]),
+          el("div", {classe:"carte-crit", texte:criteres(a, true)}),
+          el("div", {classe:"carte-aimee", texte:aimeePar(a)})
+        ])
+      : el("div", {classe:"carte-corps"}, [
+          el("div", {classe:"carte-meta"}, [badgePrio(a), el("span", {classe:"source", texte:txt(a.source) || "Source inconnue"})]),
+          el("div", {classe:"carte-prix"}, [el("span", {texte:estNb(a.prix) ? euros(a.prix) : "Prix non précisé"})]),
+          el("div", {classe:"carte-lieu"}, [el("b", {texte:lieu(a)}), m2 ? el("span", {classe:"m2", texte:" · " + nb(m2) + " €/m²"}) : null]),
+          el("div", {classe:"carte-crit", texte:criteres(a)}),
+          el("div", {classe:"carte-aimee", texte:aimeePar(a)})
+        ]);
+    var art = el("article", {classe:"carte carte-fav" + (S.bureau ? " carte-h" : "") + (cdc ? " carte-cdc" : ""), "aria-label":lieu(a) + ", " + (estNb(a.prix) ? euros(a.prix) : "prix non précisé")}, [
+      el("div", {classe:"carte-haut"}, [image(a, {coeur:true, partage:!S.bureau, tags:!S.bureau}), corps])
+    ]);
     return cliquable(art, a.num);
   }
   /* Carte du Suivi : la dernière entrée du journal, le fil complet est dans la fiche. */
@@ -996,6 +1154,7 @@
     var f = S.fond;
     if (f.nom === "prio") return trier(filtrer(parPrio(f.n), true), false);
     if (f.nom === "suivi") return trier(filtrer(suivis(), false), true);
+    if (f.nom === "favoris") return favorisFiltres();
     return null;
   }
   function ligneCout(lib, val, o){
@@ -1081,7 +1240,8 @@
       ]);
     }
     return el("div", {classe:"fiche-actions"}, [
-      el("button", {type:"button", classe:"act" + (a.favori ? " favori-actif" : ""), "aria-pressed":a.favori ? "true" : "false", onclick:function(){ basculerFavori(a); }}, [ico("heart", a.favori), el("span", {texte:"Favori"})]),
+      el("button", {type:"button", classe:"act act-favori" + (estFavori(a) ? " favori-actif" : ""), "aria-haspopup":"dialog", "aria-label":"Qui l'aime ?" + (estFavori(a) ? " " + aimeePar(a) : ""),
+        onclick:function(){ ouvrirQuiAime(a, this); }}, [el("span", {classe:"act-coeur"}, [ico("heart", estFavori(a)), initiales(a)]), el("span", {texte:"Favori"})]),
       el("button", {type:"button", classe:"act" + (a.enContact ? " actif" : ""), "aria-pressed":a.enContact ? "true" : "false", onclick:function(){ basculerContact(a); }}, [ico(a.enContact ? "check" : "phone"), el("span", {texte:a.enContact ? "En contact" : "Contact"})]),
       el("button", {type:"button", classe:"act" + (dansComp ? " actif" : ""), "aria-pressed":dansComp ? "true" : "false", disabled:plein, title:plein ? "3 annonces au plus" : null, onclick:function(){ basculerComparer(a.num); }}, [ico("colonnes"), el("span", {texte:"Comparer"})]),
       boutonCorbeille(a, "act", [ico("trash"), el("span", {texte:"Corbeille"})]),
@@ -1134,6 +1294,58 @@
     ]);
     return el("div", {classe:"couche couche-fiche"}, [el("div", {classe:"voile", onclick:fermerFiche}), feuille]);
   }
+  /* ---------- Favoris ---------- */
+  function favorisFiltres(){
+    var l = favoris(), f = UI.favFiltre;
+    if (f === "jl") return l.filter(estCoupDeCoeur);
+    if (f === "j") return l.filter(aimeJ);
+    if (f === "l") return l.filter(aimeL);
+    /* « Tous » : coups de cœur, puis Jérémy seul, puis Line seule. */
+    return l.filter(estCoupDeCoeur).concat(l.filter(function(a){ return aimeJ(a) && !aimeL(a); }), l.filter(function(a){ return aimeL(a) && !aimeJ(a); }));
+  }
+  function filtresFavoris(){
+    var l = favoris();
+    var defs = [
+      {id:"tous", n:l.length, contenu:[el("span", {texte:"Tous"})], lib:"Tous"},
+      {id:"jl", n:l.filter(estCoupDeCoeur).length, contenu:[el("span", {classe:"deux-coeurs", "aria-hidden":"true"}, [ico("heart", true), ico("heart", true)]), el("span", {texte:"J & L"})], lib:"Coups de cœur, Jérémy et Line"},
+      {id:"j", n:l.filter(aimeJ).length, contenu:[el("span", {classe:"pastille pastille-jeremy", "aria-hidden":"true", texte:"J"})], lib:"Favoris de Jérémy"},
+      {id:"l", n:l.filter(aimeL).length, contenu:[el("span", {classe:"pastille pastille-line", "aria-hidden":"true", texte:"L"})], lib:"Favoris de Line"}
+    ];
+    return el("div", {classe:"filtres-fav", role:"group", "aria-label":"Filtrer les favoris"}, [
+      S.bureau ? el("span", {classe:"outils-nb", texte:D ? pluriel(l.length, "favori") : "Chargement…"}) : null
+    ].concat(defs.map(function(d){
+      return el("button", {type:"button", classe:"puce puce-fav", "aria-pressed":UI.favFiltre === d.id ? "true" : "false", "aria-label":d.lib + " : " + d.n,
+        onclick:function(){ UI.favFiltre = d.id; sauverUI(); rendre(); }}, d.contenu.concat([el("small", {texte:String(d.n)})]));
+    })));
+  }
+  function sectionFavoris(titre, liste, classe){
+    if (!liste.length) return null;
+    return el("section", {classe:"sec-fav" + (classe ? " " + classe : "")}, [
+      el("div", {classe:"sec-fav-tete"}, [el("h2", null, titre), el("span", {classe:"gris", texte:String(liste.length)})]),
+      el("div", {classe:"cartes cartes-fav"}, liste.map(carteFavori))
+    ]);
+  }
+  function vueFavoris(){
+    var box = el("div", {classe:"favoris"}, [filtresFavoris()]);
+    if (!D){ box.appendChild(squelettes("cards")); return box; }
+    var tous = favoris(), f = UI.favFiltre;
+    if (!tous.length){ box.appendChild(el("p", {classe:"vide", texte:"Pas encore de favori. Touchez le cœur d'une annonce pour dire qui l'aime."})); return box; }
+    if (f === "tous"){
+      var cdc = tous.filter(estCoupDeCoeur), j = tous.filter(function(a){ return aimeJ(a) && !aimeL(a); }), l = tous.filter(function(a){ return aimeL(a) && !aimeJ(a); });
+      box.appendChild(sectionFavoris([ico("heart", true), " Coups de cœur"], cdc, "sec-cdc"));
+      if (S.bureau) box.appendChild(sectionFavoris(["Jérémy seul · Line seule"], j.concat(l)));
+      else { box.appendChild(sectionFavoris(["Jérémy"], j)); box.appendChild(sectionFavoris(["Line"], l)); }
+      return box;
+    }
+    var liste = favorisFiltres();
+    if (!liste.length){
+      box.appendChild(el("p", {classe:"vide", texte:f === "jl" ? "Pas encore d'annonce qui vous plaise à tous les deux." : "Aucun favori de " + (f === "j" ? "Jérémy" : "Line") + " pour l'instant."}));
+      return box;
+    }
+    box.appendChild(el("div", {classe:"cartes cartes-fav"}, liste.map(carteFavori)));
+    return box;
+  }
+
   /* ---------- Accueil ---------- */
   function surtitreVeille(){
     var d = D && D.rapport ? D.rapport.derniereVeille : null;
@@ -1151,7 +1363,7 @@
   }
   function vueAccueil(){
     var p = el("div", {classe:"accueil"});
-    var pep = enLice().filter(function(a){ return a.pepite && (estNew(a) || a.favori); }).sort(function(x, y){ return comparerNb(x.score, y.score, true) || x.num - y.num; });
+    var pep = enLice().filter(function(a){ return a.pepite && (estNew(a) || estFavori(a)); }).sort(function(x, y){ return comparerNb(x.score, y.score, true) || x.num - y.num; });
     var indic = el("span", {classe:"indic-carrousel", "aria-hidden":"true", texte:pep.length > 1 && !S.bureau ? "1 / " + pep.length : ""});
     var tete = el("div", {classe:"sec-tete"}, [el("h2", {classe:"surtitre-sec", texte:"Pépites du moment"}), S.bureau ? el("span", {classe:"gris", texte:majuscule(surtitreVeille())}) : indic]);
     var sec = el("section", {classe:"sec-pepites"}, [tete]);
@@ -1174,34 +1386,53 @@
     }
     p.appendChild(sec);
 
+    /* Dernière veille : les 3 stats et le résumé repliable (fermé par défaut, état gardé sur l'appareil). */
     var R = (D && D.rapport) || {}, st = R.stats || {};
-    var stats = el("div", {classe:"stats"}, [["lues","annonces lues"],["retenues","retenues"],["doublons","doublons écartés"]].map(function(s){
+    var stats = [["lues","annonces lues"],["retenues","retenues"],["doublons","doublons écartés"]].map(function(s){
       return el("div", {classe:"stat"}, [el("b", {texte:estNb(st[s[0]]) ? nb(st[s[0]]) : "—"}), el("span", {texte:s[1]})]);
-    }));
-    var paras = Array.isArray(R.paragraphes) ? R.paragraphes : [];
-    var resume = el("section", {classe:"bloc-resume"}, [el("h2", {classe:"surtitre-sec", texte:"Résumé de la veille"})].concat(
-      paras.length ? paras.map(function(t){ return el("p", {texte:txt(t)}); }) : [el("p", {classe:"inconnu", texte:D ? "Pas de résumé pour cette veille." : "…"})]));
-    var prios = el("section", {classe:"bloc-prios"}, [
+    });
+    var paras = (Array.isArray(R.paragraphes) ? R.paragraphes : []).map(txt).filter(Boolean);
+    var ouvert = UI.resumeOuvert && paras.length > 0;
+    var premiere = paras.length ? (paras[0].match(/^.*?[.!?](?=\s|$)/) || [paras[0]])[0] : (D ? "Pas de résumé pour cette veille." : "…");
+    function basculerResume(){ UI.resumeOuvert = !UI.resumeOuvert; sauverUI(); rendre(); }
+    var resume = el("div", {classe:"resume-veille" + (ouvert ? " ouvert" : "")}, S.bureau
+      ? [
+          el("div", {classe:"rv-tete"}, [
+            el("b", {texte:"Résumé de la veille"}),
+            paras.length ? el("button", {type:"button", classe:"rv-bascule", "aria-expanded":ouvert ? "true" : "false", "aria-controls":"rv-texte", onclick:basculerResume},
+              [ouvert ? "Replier" : "Lire", el("span", {classe:"chevron" + (ouvert ? " haut" : "")}, [ico("chevron")])]) : null
+          ]),
+          el("div", {classe:"rv-texte", id:"rv-texte"}, ouvert ? paras.map(function(t){ return el("p", {texte:t}); }) : [el("p", {classe:"rv-apercu", texte:paras.join(" ") || premiere})])
+        ]
+      : [
+          el("button", {type:"button", classe:"rv-bascule rv-ligne", "aria-expanded":ouvert ? "true" : "false", "aria-controls":"rv-texte", disabled:!paras.length, onclick:basculerResume}, [
+            el("span", {classe:"rv-txt"}, [el("b", {texte:"Résumé de la veille"}), ouvert ? null : el("span", {classe:"rv-apercu", texte:premiere})]),
+            el("span", {classe:"chevron" + (ouvert ? " haut" : "")}, [ico("chevron")])
+          ]),
+          ouvert ? el("div", {classe:"rv-texte", id:"rv-texte"}, paras.map(function(t){ return el("p", {texte:t}); })) : null
+        ]);
+    p.appendChild(el("section", {classe:"bande bande-veille"}, [
+      el("div", {classe:"sec-tete"}, [el("h2", {classe:"surtitre-sec", texte:"Dernière veille"})]),
+      el("div", {classe:"carte-veille"}, [el("div", {classe:"stats"}, stats), resume])
+    ]));
+    p.appendChild(el("section", {classe:"bande bloc-prios"}, [
       el("h2", {classe:"surtitre-sec", texte:"Par prio"}),
       el("div", {classe:"grille-prios"}, [1,2,3,4].map(function(n){
         var P = PRIOS[n] || {};
         return el("button", {type:"button", classe:"cellule-prio", onclick:function(){ aller({nom:"prio", n:n}); }}, [
           el("span", {classe:"cp-n", texte:"P" + n}),
           el("b", {texte:D ? String(parPrio(n).length) : "—"}),
-          P.zone ? el("small", {texte:P.zone}) : null,
-          P.cibleMax ? el("small", {texte:"cible ≤ " + kEuros(P.cibleMax)}) : null
+          el("span", {classe:"cp-txt"}, [
+            P.zone ? el("small", {classe:"cp-zone", texte:P.zone}) : null,
+            P.cibleMax ? el("small", {texte:"cible ≤ " + kEuros(P.cibleMax)}) : null
+          ])
         ]);
       }))
-    ]);
-    var crit = el("section", {classe:"bloc-criteres"}, [
+    ]));
+    p.appendChild(el("section", {classe:"bande bloc-criteres"}, [
       el("h2", {classe:"surtitre-sec", texte:"Nos critères"}),
       el("div", {classe:"chips"}, CRITERES.map(function(c){ return el("span", {classe:"chip", texte:c}); }))
-    ]);
-    if (S.bureau){
-      p.appendChild(el("div", {classe:"grille-accueil"}, [resume, stats, prios, crit]));
-    } else {
-      p.appendChild(stats); p.appendChild(resume); p.appendChild(prios); p.appendChild(crit);
-    }
+    ]));
     return p;
   }
 
@@ -1243,7 +1474,7 @@
     return cles.map(function(k){ return k === cible; });
   }
   function candidatsComparer(){
-    return enLice().filter(function(a){ return (a.favori || a.enContact) && UI.compareIds.indexOf(a.num) < 0; }).sort(function(x, y){ return comparerNb(x.score, y.score, true); });
+    return enLice().filter(function(a){ return (estFavori(a) || a.enContact) && UI.compareIds.indexOf(a.num) < 0; }).sort(function(x, y){ return comparerNb(x.score, y.score, true); });
   }
   function listeCandidats(){
     var l = candidatsComparer();
@@ -1275,7 +1506,8 @@
           el("button", {type:"button", classe:"c-retirer", "aria-label":"Retirer n°" + a.num + " de la comparaison", onclick:function(){ basculerComparer(a.num); }}, [ico("x")])
         ]),
         el("button", {type:"button", classe:"c-lieu", onclick:function(){ ouvrirFiche(a.num); }}, [lieu(a)]),
-        el("p", {classe:"c-meta"}, ["P" + a.prio + " · n°" + a.num + " · " + (txt(a.source) || "—"), a.favori ? el("span", {classe:"c-coeur"}, [" · ", ico("heart", true)]) : null])
+        el("p", {classe:"c-meta"}, ["P" + a.prio + " · n°" + a.num + " · " + (txt(a.source) || "—"),
+          estFavori(a) ? el("span", {classe:"c-coeur", "aria-label":aimeePar(a)}, [" · ", ico("heart", true), " " + PERSONNES.filter(function(p){ return a[p.cle] === true; }).map(function(p){ return p.init; }).join(" · ")]) : null])
       ]);
     })).concat(vide ? [S.bureau
       ? el("th", {classe:"c-col c-libre", scope:"col"}, [el("b", {texte:"+ Ajouter une annonce"}), el("small", {texte:"Depuis vos favoris et le suivi"}), el("div", {classe:"candidats"}, listeCandidats())])
@@ -1554,6 +1786,7 @@
     var r = S.route.nom === "fiche" ? S.fond : S.route;
     if (r.nom === "prio") return "Prio " + r.n + " · " + pluriel(trier(filtrer(parPrio(r.n), true)).length, "annonce");
     if (r.nom === "suivi") return "Suivi · " + suivis().length + " en contact";
+    if (r.nom === "favoris") return "Favoris · " + pluriel(favoris().length, "annonce");
     if (r.nom === "comparer") return "Comparer · " + UI.compareIds.length + " / " + MAX_COMPARER;
     if (r.nom === "corbeille") return "Corbeille · " + dansCorbeille().length;
     return surtitreVeille();
@@ -1588,22 +1821,28 @@
       return el("button", {type:"button", classe:"eb-lien" + (classe ? " " + classe : "") + (p.nom === nom ? " actif" : ""), "aria-current":p.nom === nom ? "page" : null, onclick:function(){ aller({nom:nom}); }}, [lib, compte !== null ? el("small", {texte:compte}) : null]);
     }
     h.appendChild(el("div", {classe:"eb-droite"}, [
+      lien("favoris", "Favoris", D ? String(favoris().length) : ""),
       lien("suivi", "Suivi", D ? String(suivis().length) : ""),
       lien("comparer", "Comparer", UI.compareIds.length + "/" + MAX_COMPARER),
       lien("corbeille", "Corbeille", null, "gris"),
-      el("button", {type:"button", classe:"btn eb-ajouter" + (p.nom === "ajouter" ? " actif" : ""), onclick:function(){ aller({nom:"ajouter"}); }}, ["+ Ajouter des annonces"])
+      el("button", {type:"button", classe:"btn eb-ajouter" + (p.nom === "ajouter" ? " actif" : ""), onclick:function(){ aller({nom:"ajouter"}); }}, ["+ Ajouter", el("span", {classe:"eb-suite", texte:"\u00a0des annonces"})])
     ]));
   }
   function menuMobile(){
-    function entree(nom, icone, lib, compte, classe){
-      return el("button", {type:"button", classe:"menu-entree" + (classe ? " " + classe : ""), onclick:function(){ S.menu = false; aller({nom:nom}); }}, [
-        ico(icone), el("span", {texte:lib}), compte !== null ? el("small", {texte:compte}) : null
+    var actif = pageActive().nom;
+    function entree(nom, icone, lib, compte, classe, extra){
+      return el("button", {type:"button", classe:"menu-entree" + (classe ? " " + classe : "") + (actif === nom ? " actif" : ""), "aria-current":actif === nom ? "page" : null,
+        onclick:function(){ S.menu = false; aller({nom:nom}); }}, [
+        ico(icone, nom === "favoris"), el("span", {texte:lib}), extra || null, compte !== null ? el("small", {texte:compte}) : null
       ]);
     }
+    var nCdc = D ? favoris().filter(estCoupDeCoeur).length : 0;
     return el("div", {classe:"couche couche-menu"}, [
       el("div", {classe:"voile", onclick:function(){ S.menu = false; rendre(); }}),
       el("nav", {classe:"menu", "aria-label":"Menu"}, [
         entree("accueil", "maison", "Accueil", null),
+        entree("favoris", "heart", "Favoris", D ? String(favoris().length) : null, "menu-favoris",
+          nCdc ? el("small", {classe:"pilule-cdc", "aria-label":nCdc + " coups de cœur"}, [String(nCdc) + " ", el("span", {classe:"deux-coeurs", "aria-hidden":"true"}, [ico("heart", true), ico("heart", true)])]) : null),
         entree("suivi", "phone", "Suivi", D ? String(suivis().length) : null),
         entree("comparer", "colonnes", "Comparer", UI.compareIds.length + " / " + MAX_COMPARER),
         entree("ajouter", "plus", "Ajouter des annonces", null),
@@ -1659,7 +1898,23 @@
     if (S.choix && !S.bureau){ c.appendChild(feuilleChoix()); bloque = true; }
     var dlg = dialogue();
     if (dlg){ c.appendChild(dlg); bloque = true; }
+    var qa = quiAime();
+    if (qa){ c.appendChild(qa); if (!S.bureau) bloque = true; }
     document.documentElement.classList.toggle("bloque", bloque);
+    /* Une couche déjà ouverte au rendu précédent ne rejoue pas son animation d'entrée
+       (sinon la feuille remonte à chaque interrupteur touché). */
+    var avant = S.couchesOuvertes || {}, maintenant = {};
+    Array.prototype.forEach.call(c.children, function(n){
+      var k = n.className + (S.route.nom === "fiche" ? "#" + S.route.num : "");
+      maintenant[k] = true;
+      if (avant[k]) n.classList.add("deja");
+    });
+    S.couchesOuvertes = maintenant;
+    /* Menu « Qui l'aime ? » (ordinateur) : le focus reste sur l'interrupteur touché. */
+    if (S.quiAime && S.bureau && S.quiAime.focus !== undefined){
+      var b = c.querySelectorAll(".qui-aime .interrupteur")[S.quiAime.focus];
+      if (b) b.focus();
+    }
   }
   function dialogue(){
     var d = S.dialogue, a = d ? trouver(d.num) : null;
@@ -1731,6 +1986,7 @@
     var r = pageActive();
     if (r.nom === "prio") return vueListe("prio", r.n);
     if (r.nom === "suivi") return vueListe("suivi");
+    if (r.nom === "favoris") return vueFavoris();
     if (r.nom === "comparer") return vueComparer();
     if (r.nom === "ajouter") return vueAjouter();
     if (r.nom === "corbeille") return vueCorbeille();
@@ -1871,6 +2127,7 @@
   document.addEventListener("keydown", function(e){
     if (e.key !== "Escape") return;
     if (S.dialogue){ fermerDialogue(); return; }
+    if (S.quiAime){ fermerQuiAime(); return; }
     if (S.tri || S.menu || S.choix){ S.tri = null; S.menu = false; S.choix = false; rendre(); }
     else if (S.route.nom === "fiche") fermerFiche();
   });

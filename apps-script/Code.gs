@@ -1,10 +1,10 @@
 /**
- * Objectif New Home : API du tableau de suivi (V3.5).
+ * Objectif New Home : API du tableau de suivi (V3.6).
  * Script lié au tableau (SpreadsheetApp.getActive), publié en application web.
  *
  *  GET  <url>?cle=XXX  -> annonces non masquées (avec leur note) + journal + rapport + réglages + horodatage (JSON)
  *  POST <url> (corps JSON, envoyé en Content-Type text/plain pour éviter la requête préalable CORS) :
- *    {"cle":"XXX","action":"favori","num":5,"valeur":true}
+ *    {"cle":"XXX","action":"favori","num":5,"qui":"jeremy","valeur":true}   (qui : "jeremy" ou "line")
  *    {"cle":"XXX","action":"contact","num":5,"valeur":false}
  *    {"cle":"XXX","action":"corbeille","num":5,"raison":"Trop de travaux"}
  *    {"cle":"XXX","action":"restaurer","num":5}
@@ -19,7 +19,7 @@
  *
  * La clé est rangée dans les propriétés du script (definirCle()). Sans clé configurée, tout est refusé.
  * Les colonnes sont repérées par leur en-tête : on peut les déplacer dans le tableau.
- * Le site n'écrit que Favori, En contact, En contact depuis, Corbeille, Corbeille le,
+ * Le site n'écrit que Favori Jérémy, Favori Line, En contact, En contact depuis, Corbeille, Corbeille le,
  * Statut changé le, Raison corbeille (vidée à la restauration) et Notes, des lignes dans Ajouts et dans Journal.
  */
 
@@ -68,7 +68,9 @@ const COLONNES = [
   ['raisonCorbeille', 'Raison corbeille', 'texte'],
   ['masqueeLe', 'Masquée le', 'date'],
   ['photo', 'Photo', 'texte'],
-  ['favori', 'Favori', 'oui'],
+  // V3.6 : un favori par personne. L'ancienne colonne « Favori » peut rester dans le tableau : elle est ignorée.
+  ['favoriJeremy', 'Favori Jérémy', 'oui'],
+  ['favoriLine', 'Favori Line', 'oui'],
   ['enContact', 'En contact', 'oui'],
   ['enContactDepuis', 'En contact depuis', 'date'],
   ['corbeille', 'Corbeille', 'oui'],
@@ -83,12 +85,12 @@ const COLONNES = [
 const CHAMPS_SITE = [
   'num', 'notes', 'prio', 'commune', 'quartier', 'prix', 'surface', 'pieces', 'chambres', 'terrain', 'dpe', 'garage',
   'lien', 'lienVerifieLe', 'source', 'repereeLe', 'pepite', 'score', 'atouts', 'vigilance', 'resume', 'titre',
-  'photo', 'statutLe', 'raisonCorbeille', 'favori', 'enContact', 'enContactDepuis', 'corbeille', 'corbeilleLe',
+  'photo', 'statutLe', 'raisonCorbeille', 'favoriJeremy', 'favoriLine', 'enContact', 'enContactDepuis', 'corbeille', 'corbeilleLe',
   'etat', 'energieMin', 'energieMax', 'taxeFonciere',
 ];
 
 // Les seules colonnes d'Annonces que le site a le droit d'écrire.
-const ECRITES_PAR_LE_SITE = ['favori', 'enContact', 'enContactDepuis', 'corbeille', 'corbeilleLe', 'statutLe', 'raisonCorbeille', 'notes'];
+const ECRITES_PAR_LE_SITE = ['favoriJeremy', 'favoriLine', 'enContact', 'enContactDepuis', 'corbeille', 'corbeilleLe', 'statutLe', 'raisonCorbeille', 'notes'];
 
 const AJOUTS = {
   lien: "Lien de l'annonce", par: 'Ajouté par', commentaire: 'Commentaire', ajouteLe: 'Ajouté le',
@@ -336,7 +338,7 @@ function changerStatut_(action, corps) {
     if (avant.corbeille) throw new Error('Annonce n°' + num + ' dans la corbeille : restaurez-la d\'abord.');
   }
   if (action === 'favori') {
-    maj.favori = corps.valeur ? 'Oui' : '';
+    maj[colFavori_(corps.qui)] = corps.valeur ? 'Oui' : '';
   } else if (action === 'contact') {
     if (corps.valeur) {
       maj.enContact = 'Oui';
@@ -348,7 +350,8 @@ function changerStatut_(action, corps) {
   } else if (action === 'corbeille') {
     maj.corbeille = 'Oui';
     if (!avant.corbeille) maj.corbeilleLe = maintenant;
-    maj.favori = '';
+    maj.favoriJeremy = '';
+    maj.favoriLine = '';
     maj.enContact = '';
     maj.enContactDepuis = '';
     const raison = String(corps.raison === undefined || corps.raison === null ? '' : corps.raison).trim();
@@ -370,7 +373,9 @@ function changerStatut_(action, corps) {
   // Journal : seulement si le statut change vraiment (un double appui n'ajoute pas de ligne).
   const journal = [];
   let texte = null;
-  if (action === 'favori' && !!corps.valeur !== !!avant.favori) texte = corps.valeur ? 'Ajoutée aux favoris' : 'Retirée des favoris';
+  if (action === 'favori' && !!corps.valeur !== !!avant[colFavori_(corps.qui)]) {
+    texte = (corps.valeur ? 'Ajoutée aux favoris de ' : 'Retirée des favoris de ') + PRENOMS[corps.qui];
+  }
   else if (action === 'contact' && !!corps.valeur !== !!avant.enContact) texte = corps.valeur ? 'Passée en contact' : 'Retirée du suivi';
   else if (action === 'corbeille' && !avant.corbeille) texte = 'Mise à la corbeille' + (maj.raisonCorbeille ? ' : ' + String(corps.raison).trim().slice(0, MAX_RAISON) : '');
   else if (action === 'restaurer' && avant.corbeille) texte = 'Restaurée';
@@ -378,6 +383,14 @@ function changerStatut_(action, corps) {
   if (texte) journal.push(journaliser_(num, types[action], texte, ''));
 
   return { annonce: relireAnnonce_(L), journal: journal };
+}
+
+/* Colonne de favori d'une personne : « qui » vaut "jeremy" ou "line". */
+const PRENOMS = { jeremy: 'Jérémy', line: 'Line' };
+function colFavori_(qui) {
+  if (qui === 'jeremy') return 'favoriJeremy';
+  if (qui === 'line') return 'favoriLine';
+  throw new Error('Paramètre « qui » manquant ou inconnu (jeremy ou line).');
 }
 
 /* Note libre d'une annonce : remplacée en entier, ou vidée si le texte est vide. Pas de ligne de journal. */
@@ -659,12 +672,16 @@ function horodatage_() {
   return d;
 }
 
+function normEntete_(e) {
+  return String(e).trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ');
+}
+
 function indexEntetes_(entetes) {
   const parEntete = {};
-  COLONNES.forEach(([cle, entete]) => { parEntete[entete] = cle; });
+  COLONNES.forEach(([cle, entete]) => { parEntete[normEntete_(entete)] = cle; });
   const idx = {};
   entetes.forEach((e, i) => {
-    const cle = parEntete[String(e).trim()];
+    const cle = parEntete[normEntete_(e)];
     if (cle && idx[cle] === undefined) idx[cle] = i;
   });
   return idx;
@@ -696,6 +713,46 @@ function onglet_(nom) {
 
 function json_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * Migration V3.6, à lancer UNE fois depuis l'éditeur : crée « Favori Jérémy » et « Favori Line » juste après « Favori »,
+ * et recopie chaque Favori = Oui dans les deux (coup de cœur). Aucune ligne de journal.
+ * Sans effet si les deux colonnes existent déjà. L'ancienne colonne « Favori » est laissée telle quelle (ignorée).
+ */
+function migrerFavoris() {
+  const f = onglet_(ONGLET_ANNONCES);
+  const largeur = f.getLastColumn();
+  const entetes = f.getRange(1, 1, 1, largeur).getValues()[0].map(normEntete_);
+  if (entetes.indexOf(normEntete_('Favori Jérémy')) >= 0 || entetes.indexOf(normEntete_('Favori Line')) >= 0) {
+    Logger.log('Rien à faire : la colonne « Favori Jérémy » ou « Favori Line » existe déjà.');
+    return;
+  }
+  const iFav = entetes.indexOf(normEntete_('Favori'));
+  if (iFav < 0) throw new Error('Colonne « Favori » introuvable dans Annonces.');
+  f.insertColumnsAfter(iFav + 1, 2);
+  f.getRange(1, iFav + 2, 1, 2).setValues([['Favori Jérémy', 'Favori Line']]).setFontWeight('bold');
+  const n = f.getLastRow() - 1;
+  let copies = 0;
+  if (n > 0) {
+    const anciens = f.getRange(2, iFav + 1, n, 1).getValues();
+    const nouveaux = anciens.map(l => {
+      const oui = convertirLecture_('oui', l[0]) === true;
+      if (oui) copies++;
+      return oui ? ['Oui', 'Oui'] : ['', ''];
+    });
+    f.getRange(2, iFav + 2, n, 2).setValues(nouveaux);
+  }
+  SpreadsheetApp.flush();
+  Logger.log('Migration faite : %s favori(s) recopié(s) dans « Favori Jérémy » et « Favori Line ».', copies);
+}
+
+/** Contrôle après migration, sans rien écrire : compte les favoris par personne. */
+function testerFavoris() {
+  const l = lireAnnonces_().map(x => x.annonce).filter(a => !a.masquee);
+  const j = l.filter(a => a.favoriJeremy).length, li = l.filter(a => a.favoriLine).length;
+  const deux = l.filter(a => a.favoriJeremy && a.favoriLine).length;
+  Logger.log('Favoris Jérémy : %s, Favoris Line : %s, coups de cœur : %s (sur %s annonces visibles).', j, li, deux, l.length);
 }
 
 /** Crée une nouvelle clé (et invalide l'ancienne). À relancer si la clé a fuité. */

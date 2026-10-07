@@ -96,7 +96,6 @@
       ],
       "resume": "Pépite fictive pour tester l'accueil, la fiche et le comparateur.",
       "titre": "Maison fictive avec jardin et garage",
-      "favori": true,
       "enContact": true,
       "enContactDepuis": "2026-10-03T08:00:00.000Z",
       "statutLe": "2026-10-03T08:00:00.000Z",
@@ -105,7 +104,9 @@
       "energieMax": 2940,
       "taxeFonciere": 1680,
       "lienVerifieLe": "2026-10-05T08:40:00.000Z",
-      "notes": "Mémo fictif : agence Exemple, demander le diagnostic toiture."
+      "notes": "Mémo fictif : agence Exemple, demander le diagnostic toiture.",
+      "favoriJeremy": true,
+      "favoriLine": true
     },
     {
       "num": 102,
@@ -131,9 +132,10 @@
         "Au-dessus de la cible"
       ],
       "resume": "Pépite fictive en favori, sans photo, avec énergie seule.",
-      "favori": true,
       "energieMin": 2520,
-      "energieMax": 3420
+      "energieMax": 3420,
+      "favoriJeremy": true,
+      "favoriLine": true
     },
     {
       "num": 103,
@@ -172,7 +174,8 @@
       "score": 70,
       "resume": "Annonce fictive sans quartier ni commune.",
       "etat": "À rénover",
-      "lienVerifieLe": "2026-10-05T08:40:00.000Z"
+      "lienVerifieLe": "2026-10-05T08:40:00.000Z",
+      "favoriLine": true
     },
     {
       "num": 201,
@@ -235,7 +238,8 @@
       "pepite": true,
       "score": 81,
       "resume": "Au-delà du plafond frais compris ; pépite New.",
-      "lienVerifieLe": "2026-10-05T08:40:00.000Z"
+      "lienVerifieLe": "2026-10-05T08:40:00.000Z",
+      "favoriLine": true
     },
     {
       "num": 301,
@@ -255,7 +259,8 @@
       "score": 88,
       "resume": "Dans la cible Prio 3.",
       "etat": "Habitable en l'état",
-      "lienVerifieLe": "2026-10-05T08:40:00.000Z"
+      "lienVerifieLe": "2026-10-05T08:40:00.000Z",
+      "favoriJeremy": true
     },
     {
       "num": 302,
@@ -345,7 +350,7 @@
       "le": "2026-10-01T09:00:00.000Z",
       "num": 101,
       "type": "Favori",
-      "texte": "Ajoutée aux favoris"
+      "texte": "Ajoutée aux favoris de Jérémy"
     },
     {
       "le": "2026-10-03T08:00:00.000Z",

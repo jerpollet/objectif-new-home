@@ -11,6 +11,7 @@
   --plafond-fond:#fdebdd; --plafond-texte:#a4400d;
   --max-fond:#fde8e7; --max-texte:#b42318;
   --vigilance:#b5470f;
+  --jeremy:var(--encre); --line:var(--accent);
   --r-carte:16px; --r-btn:12px; --r-pilule:999px;
   --ombre-1:0 1px 2px rgba(16,24,40,.05), 0 1px 3px rgba(16,24,40,.08);
   --ombre-2:0 4px 12px rgba(16,24,40,.08);
@@ -514,14 +515,6 @@ body.sans-onglets .message{bottom:calc(84px + env(safe-area-inset-bottom, 0px))}
   .carrousel{grid-auto-columns:calc((100% - 40px) / 3);gap:20px;padding:2px 2px 12px;scroll-padding:0}
   .fleches{display:flex;justify-content:flex-end;gap:8px;margin-top:4px}
   .fleches .btn-ico{background:var(--surface);box-shadow:var(--ombre-1);border-radius:50%}
-  .grille-accueil{display:grid;grid-template-columns:1.1fr 1fr;gap:20px;margin-top:24px;align-items:start}
-  .grille-accueil > *{margin:0;background:var(--surface);border-radius:var(--r-carte);box-shadow:var(--ombre-1);padding:22px 24px}
-  .grille-accueil .stats{padding:0}
-  .grille-accueil .stat{padding:22px 24px}
-  .grille-accueil .stat b{font-size:32px}
-  .grille-accueil .cellule-prio{box-shadow:none;background:var(--creux)}
-  .grille-accueil .bloc-criteres .chip{box-shadow:none;background:var(--creux)}
-  .grille-accueil .bloc-resume{grid-row:span 2}
 
   .comparer{padding:24px 28px 40px}
   .comparer-defil{margin:0}
@@ -619,4 +612,182 @@ body.sans-onglets .message{bottom:calc(84px + env(safe-area-inset-bottom, 0px))}
 @media (min-width:1024px){
   .dialogue{left:50%;top:50%;bottom:auto;right:auto;width:460px;max-height:80vh;transform:translate(-50%,-50%);border-radius:20px;animation:apparait .15s ease}
   .dlg-pied{padding-bottom:16px}
+}
+
+/* ---------- V3.6 : favori à deux, « Qui l'aime ? », onglet Favoris, accueil réordonné ---------- */
+/* Une couche déjà ouverte ne rejoue pas son animation d'entrée. */
+.deja, .deja *{animation:none !important}
+
+/* Initiales sous le cœur : J encre, L accent, chevauchement de 4 px. */
+.coeur:not(.coeur-boite):not(.partage-boite){position:relative}
+.initiales{position:absolute;top:29px;right:0;display:flex;z-index:2;pointer-events:none}
+.ini{width:17px;height:17px;border-radius:50%;border:1.5px solid #fff;display:grid;place-items:center;font-size:9px;font-weight:800;line-height:1;color:#fff}
+.ini + .ini{margin-left:-4px}
+.ini-jeremy{background:var(--jeremy)}
+.ini-line{background:var(--line)}
+.coeur-boite.indic{position:absolute}
+.coeur:not(.coeur-boite) .initiales{top:27px;right:2px}
+.act-coeur{position:relative;display:inline-grid;place-items:center}
+.act-coeur .initiales{top:12px;right:-10px}
+.act-coeur .ini{width:15px;height:15px;font-size:8px}
+
+/* Tag Coup de cœur, avant Pépite et New. */
+.tag-cdc{background:var(--max-fond);color:var(--max-texte)}
+.tag-cdc::before{content:"♥";margin-right:4px;font-size:10px}
+.ligne-annonce .tag-cdc,.tableau .tag-cdc,.carte-meta .tag-cdc{box-shadow:none}
+.c-coeur{white-space:nowrap}
+
+/* Pastilles J / L (feuille, filtres). */
+.pastille{display:inline-grid;place-items:center;flex:none;border-radius:50%;color:#fff;font-weight:800;line-height:1}
+.pastille-jeremy{background:var(--jeremy)}
+.pastille-line{background:var(--line)}
+
+/* « Qui l'aime ? » : feuille du bas (mobile). */
+.couche-qa{z-index:65}
+.qui-aime.feuille{padding-bottom:0}
+.poignee{display:flex;justify-content:center;align-items:center;width:100%;height:28px;flex:none;cursor:grab;touch-action:none}
+.poignee span{width:40px;height:5px;border-radius:var(--r-pilule);background:var(--ligne-forte)}
+.qa-tete{display:flex;align-items:center;justify-content:space-between;padding:0 6px 8px var(--gouttiere)}
+.qa-tete h2{font-size:20px;font-weight:800;letter-spacing:-.01em}
+.qa-lignes{padding:0 var(--gouttiere)}
+.qa-ligne{display:flex;align-items:center;gap:14px;width:100%;min-height:68px;border-top:1px solid var(--ligne);text-align:left}
+.qa-ligne .pastille{width:40px;height:40px;font-size:16px}
+.qa-nom{flex:1;font-size:16px;font-weight:700}
+.switch{position:relative;flex:none;width:52px;height:32px;border-radius:var(--r-pilule);background:var(--ligne-forte);transition:background .15s}
+.switch-curseur{position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:#fff;display:grid;place-items:center;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:transform .15s}
+.switch-curseur .ico{width:14px;height:14px;color:var(--gris-clair)}
+.switch.on{background:var(--favori)}
+.switch.on .switch-curseur{transform:translateX(20px)}
+.switch.on .switch-curseur .ico{color:var(--favori)}
+.qa-ligne:focus-visible{outline:none}
+.qa-ligne:focus-visible .switch{outline:2px solid var(--accent);outline-offset:2px}
+.qa-cdc{display:flex;align-items:center;gap:12px;margin:8px var(--gouttiere) 0;padding:12px 14px;border-radius:14px;background:var(--max-fond);color:var(--max-texte);animation:cdc .18s ease}
+.qa-cdc .ico{width:20px;height:20px;flex:none}
+.qa-cdc b{display:block;font-size:14px;font-weight:800}
+.qa-cdc span{font-size:13px;line-height:1.4}
+@keyframes cdc{from{opacity:0;transform:translateY(4px)}}
+.qa-fermer{justify-content:center;background:var(--creux)}
+
+/* « Qui l'aime ? » : menu accroché au cœur (ordinateur). */
+.couche-qa-menu{z-index:65}
+.voile-transparent{background:transparent;animation:none}
+.qa-menu{position:fixed;width:280px;background:var(--surface);border-radius:14px;box-shadow:var(--ombre-3);border:1px solid var(--ligne);padding:6px;animation:apparait .12s ease}
+.qa-menu .qa-tete{padding:4px 2px 6px 10px}
+.qa-menu .qa-tete h2{font-size:17px}
+.qa-menu .qa-tete .btn-ico{width:32px;height:32px}
+.qa-menu .qa-tete .btn-ico .ico{width:18px;height:18px}
+.qa-menu .qa-lignes{padding:0 10px}
+.qa-menu .qa-ligne{min-height:52px;gap:12px}
+.qa-menu .qa-ligne .pastille{width:32px;height:32px;font-size:13px}
+.qa-menu .qa-nom{font-size:14px}
+.qa-menu .switch{width:44px;height:26px}
+.qa-menu .switch-curseur{width:20px;height:20px}
+.qa-menu .switch-curseur .ico{width:11px;height:11px}
+.qa-menu .switch.on .switch-curseur{transform:translateX(18px)}
+.qa-menu .qa-cdc{margin:4px 4px 4px;border-radius:12px;padding:10px 12px;gap:10px}
+.qa-menu .qa-cdc .ico{width:16px;height:16px}
+.qa-menu .qa-cdc b{font-size:13px}
+.qa-menu .qa-cdc span{font-size:12px}
+
+/* Menu burger : entrée Favoris, page active. */
+.menu-entree.actif{background:var(--accent-100)}
+.menu-entree.actif .ico{background:var(--surface)}
+.menu-favoris .ico{color:var(--favori)}
+.menu-entree .pilule-cdc{display:inline-flex;align-items:center;gap:4px;background:var(--max-fond);color:var(--max-texte)}
+.deux-coeurs{display:inline-flex;align-items:center}
+.deux-coeurs .ico{width:14px;height:14px;color:var(--favori);padding:0;background:none;border-radius:0}
+.deux-coeurs .ico + .ico{margin-left:-5px}
+.menu-entree .deux-coeurs .ico{width:12px;height:12px;color:var(--max-texte)}
+
+/* Onglet Favoris. */
+.filtres-fav{display:flex;align-items:center;gap:8px;padding:14px var(--gouttiere) 4px;overflow-x:auto;scrollbar-width:none}
+.filtres-fav::-webkit-scrollbar{display:none}
+.puce-fav small{font-size:11px;font-weight:700;opacity:.75}
+.puce-fav .pastille{width:22px;height:22px;font-size:11px}
+.puce-fav[aria-pressed="true"] .deux-coeurs .ico{color:#fff}
+.puce-fav[aria-pressed="true"] .pastille{box-shadow:0 0 0 1.5px #fff}
+.sec-fav-tete{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:18px var(--gouttiere) 0}
+.sec-fav-tete h2{display:flex;align-items:center;gap:6px;font-size:17px;font-weight:800;letter-spacing:-.01em}
+.sec-cdc .sec-fav-tete h2{color:var(--max-texte)}
+.sec-fav-tete h2 .ico{width:18px;height:18px}
+.carte-aimee{font-size:12px;color:var(--gris);margin-top:6px}
+.carte-cdc{box-shadow:0 0 0 2px var(--max-fond), var(--ombre-1)}
+
+/* Accueil : Dernière veille (stats + résumé repliable). */
+.carte-veille{margin:0 var(--gouttiere);background:var(--surface);border-radius:var(--r-carte);box-shadow:var(--ombre-1);overflow:hidden}
+.carte-veille .stats{margin:0;box-shadow:none;border-radius:0;background:none}
+.resume-veille{border-top:1px solid var(--ligne);background:#fafaf8}
+.rv-ligne{display:flex;align-items:center;gap:12px;width:100%;min-height:56px;padding:10px 16px;text-align:left}
+.rv-ligne:disabled{cursor:default}
+.rv-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.rv-txt b{font-size:14px;font-weight:700}
+.rv-apercu{font-size:13px;color:var(--gris);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chevron{display:inline-grid;place-items:center;color:var(--gris);flex:none}
+.chevron .ico{width:20px;height:20px;transition:transform .15s}
+.chevron.haut .ico{transform:rotate(180deg)}
+.rv-tete .chevron .ico{width:16px;height:16px}
+.rv-texte{padding:0 16px 14px}
+.rv-texte p{font-size:15px;line-height:1.55;color:#34383e;margin-top:8px}
+.rv-texte p:first-child{margin-top:0}
+.cp-txt{display:flex;flex-direction:column;gap:1px}
+.bande-veille{margin-top:4px}
+
+@media (min-width:1024px){
+  /* En-tête : tout tient sur une ligne à 1024 et 1280 px. */
+  .entete-bureau .titre-app{padding:0 24px}
+  .entete-bureau .titre-app,.eb-prio,.eb-lien,.eb-ajouter{white-space:nowrap;flex:none}
+  .eb-prio{padding:0 12px}
+  .eb-lien{padding:0 10px}
+  .entete-bureau .titre-app.actif::after,.eb-prio.actif::after,.eb-lien.actif::after{left:10px;right:10px}
+
+  /* Favoris : cartes horizontales compactes, 3 colonnes. */
+  .filtres-fav{padding:18px 28px 6px}
+  .sec-fav-tete{padding:18px 28px 0;justify-content:flex-start}
+  .favoris .cartes-fav{grid-template-columns:repeat(3, minmax(0,1fr));gap:20px;padding:14px 28px 8px}
+  .carte-h .carte-haut{display:grid;grid-template-columns:150px 1fr;min-height:138px}
+  .carte-h .carte-haut > .img{aspect-ratio:auto;height:100%}
+  .carte-h .carte-corps{padding:12px 14px;gap:3px}
+  .carte-h .carte-prix{font-size:20px}
+  .carte-h .carte-lieu{font-size:14px}
+  .carte-h .carte-crit{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .carte-h .carte-aimee{margin-top:auto;padding-top:6px}
+  .carte-h .carte-meta{gap:6px}
+
+  /* Accueil en bandes pleine largeur. */
+  .accueil > section + section{margin-top:28px}
+  .bande-veille .sec-tete{padding:0 0 14px}
+  .carte-veille{margin:0;display:grid;grid-template-columns:3fr 2.4fr}
+  .carte-veille .stat{padding:22px 24px}
+  .carte-veille .stat b{font-size:32px}
+  .resume-veille{border-top:0;border-left:1px solid var(--ligne);padding:18px 22px}
+  .rv-tete{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .rv-tete b{font-size:14px;font-weight:700}
+  .rv-bascule{display:inline-flex;align-items:center;gap:4px;font-size:13px;color:var(--gris);min-height:32px}
+  .rv-bascule:hover{color:var(--encre)}
+  .resume-veille .rv-texte{padding:0;margin-top:6px}
+  .resume-veille .rv-texte p{font-size:14px}
+  .resume-veille:not(.ouvert) .rv-apercu{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:14px}
+  .bloc-prios,.bloc-criteres{padding:0}
+  .grille-prios{gap:20px;margin-top:14px}
+  .cellule-prio{display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:14px;row-gap:2px;align-items:center;padding:18px 20px;min-height:0}
+  .cellule-prio b{grid-row:1 / span 2;font-size:32px;margin:0}
+  .cellule-prio .cp-n{justify-self:start;align-self:end}
+  .cellule-prio .cp-txt{align-self:start}
+  .cellule-prio .cp-zone{font-size:13px;font-weight:600;color:var(--encre)}
+  .cellule-prio small{font-size:12px}
+  .bloc-criteres .chips{margin-top:14px}
+}
+@media (min-width:1024px) and (max-width:1279px){
+  /* Entre 1024 et 1279 px : en-tête resserré, le bouton devient « + Ajouter ». */
+  .entete-bureau{padding-right:14px}
+  .entete-bureau .titre-app{padding:0 16px;font-size:17px}
+  .eb-prio{padding:0 8px;font-size:14px;gap:6px}
+  .eb-lien{padding:0 7px;font-size:13px;gap:5px}
+  .eb-suite{display:none}
+  .eb-ajouter{padding:0 14px;margin-left:6px}
+  .entete-bureau .titre-app.actif::after,.eb-prio.actif::after,.eb-lien.actif::after{left:6px;right:6px}
+}
+@media (min-width:1024px){
+  .eb-ajouter{gap:0}
+  .carte-pepite .img{aspect-ratio:16/9}
 }
