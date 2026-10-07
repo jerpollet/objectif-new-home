@@ -1332,9 +1332,11 @@
     if (!tous.length){ box.appendChild(el("p", {classe:"vide", texte:"Pas encore de favori. Touchez le cœur d'une annonce pour dire qui l'aime."})); return box; }
     if (f === "tous"){
       var cdc = tous.filter(estCoupDeCoeur), j = tous.filter(function(a){ return aimeJ(a) && !aimeL(a); }), l = tous.filter(function(a){ return aimeL(a) && !aimeJ(a); });
-      box.appendChild(sectionFavoris([ico("heart", true), " Coups de cœur"], cdc, "sec-cdc"));
-      if (S.bureau) box.appendChild(sectionFavoris(["Jérémy seul · Line seule"], j.concat(l)));
-      else { box.appendChild(sectionFavoris(["Jérémy"], j)); box.appendChild(sectionFavoris(["Line"], l)); }
+      /* Une section vide n'est pas affichée (sectionFavoris renvoie null). */
+      var secs = [sectionFavoris([ico("heart", true), " Coups de cœur"], cdc, "sec-cdc")].concat(S.bureau
+        ? [sectionFavoris(["Jérémy seul · Line seule"], j.concat(l))]
+        : [sectionFavoris(["Jérémy"], j), sectionFavoris(["Line"], l)]);
+      secs.forEach(function(x){ if (x) box.appendChild(x); });
       return box;
     }
     var liste = favorisFiltres();
