@@ -136,12 +136,26 @@ Entre les étapes 4 et 5, l'ancien site affiche les cœurs vides et refuse les f
 |---|---|---|
 | 1 | Jérémy | Pas de veille en cours (ni pendant la bascule). Noter la version actuellement déployée (§ 2, étape 2) : c'est la version de retour arrière. |
 | 2 | Jérémy | Apps Script : remplacer tout `Code.gs` par [`apps-script/Code.gs`](apps-script/Code.gs) (V3.6), enregistrer. |
-| 3 | Jérémy | ▶ Exécuter `migrerFavoris` (une seule fois ; relancée, elle ne fait rien), puis `testerFavoris` : chaque ancien favori compte pour Jérémy **et** Line. Vérifier dans l'onglet Annonces les colonnes « Favori Jérémy » et « Favori Line », juste après « Favori ». |
+| 3 | Jérémy | ▶ Exécuter `migrerFavoris` (une seule fois ; relancée, elle ne fait rien), puis `testerFavoris` : chaque ancien favori compte pour les deux personnes. Vérifier dans l'onglet Annonces les colonnes « Favori <Prénom 1> » et « Favori <Prénom 2> », juste après « Favori ». |
 | 4 | Jérémy | ▶ `testerLecture` (`ok=true`), puis Déployer › Gérer les déploiements › crayon › **Nouvelle version** › Déployer. |
-| 5 | Claude Code | Vérifier l'API (`favoriJeremy` / `favoriLine` présents, `favori` absent), pousser `main`, attendre GitHub Pages, contrôler le site en lecture. |
+| 5 | Claude Code | Vérifier l'API (`favori<Prénom>` (une clé par personne) présents (V3.6 ; depuis V3.7 : `personnes` et `aimeePar`), `favori` absent), pousser `main`, attendre GitHub Pages, contrôler le site en lecture. |
 | 6 | Utilisateurs | Recette rapide sur téléphone (checklist du README V5). |
-| 7 | Claude (chat) | Mettre à jour le skill de veille : `COLONNES` de `scripts/tableau.py` (« Favori » remplacé par « Favori Jérémy » et « Favori Line »), et tout ce qui lit ou écrit un favori (réponses au mail « n°… favori »). |
+| 7 | Claude (chat) | Mettre à jour le skill de veille : `COLONNES` de `scripts/tableau.py` (« Favori » remplacé par « Favori <Prénom 1> » et « Favori <Prénom 2> »), et tout ce qui lit ou écrit un favori (réponses au mail « n°… favori »). |
 
 Retour arrière : revert du commit V3.6 sur `main` (Claude Code), puis Apps Script › ancienne version notée à l'étape 1.
-Les colonnes « Favori Jérémy » et « Favori Line » peuvent rester : l'ancien code les ignore et relit « Favori »,
+Les colonnes « Favori <Prénom 1> » et « Favori <Prénom 2> » peuvent rester : l'ancien code les ignore et relit « Favori »,
 qui n'a pas été touchée (les favoris posés depuis le site V3.6 n'y sont pas recopiés).
+
+## 8. Bascule V3.7 (Autres, DPE, plafonds, prénoms lus dans le tableau)
+
+Aucune écriture dans le tableau : ni colonne, ni onglet Réglages (ses libellés restent ceux que la veille lit).
+Entre les étapes 3 et 4, l'ancien site (V3.6) n'affiche plus les cœurs ni les drapeaux : faire 3 et 4 à la suite.
+
+| # | Qui | Action |
+|---|---|---|
+| 1 | Jérémy | Noter la version actuellement déployée (§ 2, étape 2) : c'est la version de retour arrière. |
+| 2 | Jérémy | Apps Script : remplacer tout `Code.gs` par [`apps-script/Code.gs`](apps-script/Code.gs) (V3.7), enregistrer. ▶ `testerLecture` (`ok=true`), puis ▶ `testerFavoris` : une ligne par colonne « Favori <Prénom> » avec son nombre de favoris. |
+| 3 | Jérémy | Déployer › Gérer les déploiements › crayon › **Nouvelle version** › Déployer. |
+| 4 | Claude Code | Vérifier l'API (`personnes`, `aimeePar`, `reglages.budget`), pousser `main`, attendre GitHub Pages, contrôler le site en lecture. |
+
+Retour arrière : revert du commit V3.7 sur `main`, puis Apps Script › ancienne version notée à l'étape 1. Rien à défaire dans le tableau.

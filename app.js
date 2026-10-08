@@ -6,8 +6,11 @@
   var LS_CLE = "onh-cle", LS_CACHE = MODE_TEST ? "onh-cache-test" : "onh-cache-v3", LS_UI = "onh-ui", LS_API = "onh-api-test", LS_PRENOM = "onh-prenom";
   var DELAI_MAX = 25000, DELAI_RELECTURE = 30000, JOUR = 864e5;
   var NOTAIRE = 0.075, MAX_COMPARER = 3;
-  /* Plafonds, cibles par Prio et critères : servis par l'API avec la clé (onglet Réglages), jamais dans le dépôt. */
-  var PRIOS = {}, PLAFOND = null, PLAFOND_MAX = null, CRITERES = [];
+  /* Budget, tolérance, plafonds indicatifs par Prio, noms des Prio et critères : servis par l'API avec la clé
+     (onglet Réglages), jamais dans le dépôt. Les prénoms viennent des en-têtes « Favori <Prénom> » du tableau. */
+  var PRIOS = {}, BUDGET = null, TOLERANCE = null, CRITERES = [], PERSONNES = [];
+  /* Prio 5 = « Autres » : vos ajouts hors de nos secteurs, sans plafond propre. */
+  var AUTRES = 5, NUMS_PRIO = [1, 2, 3, 4, 5];
   var MAX_NOTE = 2000, MAX_RAISON = 500, JOURNAL_VISIBLE = 5;
   var RAISONS_RAPIDES = ["Trop cher", "Trop de travaux", "Pas de jardin", "Mauvais quartier", "Déjà vendue"];
   var TRIS = [
@@ -16,7 +19,7 @@
     {id:"prixDesc", nom:"Prix décroissant", court:"Prix ↓"},
     {id:"recent", nom:"Plus récentes", court:"Récentes"}
   ];
-  var CHAMPS_STATUT = ["favoriJeremy", "favoriLine", "enContact", "enContactDepuis", "corbeille", "corbeilleLe", "statutLe", "raisonCorbeille"];
+  var CHAMPS_STATUT = ["aimeePar", "enContact", "enContactDepuis", "corbeille", "corbeilleLe", "statutLe", "raisonCorbeille"];
   /* Champs gardés en local pendant une écriture en cours (mise à jour optimiste). */
   var CHAMPS_LOCAUX = CHAMPS_STATUT.concat(["notes"]);
   var API_TEST = /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/;
@@ -106,14 +109,39 @@
   function fraisCompris(a){ return estNb(a.prix) ? a.prix * (1 + NOTAIRE) : null; }
   function dpe(a){ var d = txt(a.dpe).toUpperCase(); return /^[A-G]$/.test(d) ? d : null; }
   function estNew(a){ var d = date(a.repereeLe); return !!d && Date.now() - d.getTime() < 7 * JOUR; }
-  function drapeau(a){
-    if (!estNb(a.prix) || !estNb(PLAFOND) || !estNb(PLAFOND_MAX)) return null;
-    var tc = Math.round(a.prix * (1 + NOTAIRE) / 1000) * 1000, P = PRIOS[a.prio];
-    if (tc > PLAFOND_MAX) return "Au-delà de " + kEuros(PLAFOND_MAX) + " frais compris";
-    if (tc > PLAFOND) return "Au-delà de " + kEuros(PLAFOND) + " frais compris";
-    if (P && tc > P.cibleMax) return "Au-dessus de la cible";
-    return "Prix dans la cible";
+  function plafondPrio(a){ var P = a.prio !== AUTRES ? PRIOS[a.prio] : null; return P && estNb(P.plafond) ? P.plafond : null; }
+  /* Drapeau de prix : {niveau, texte, court} ou null. Le frais compris EXACT est comparé aux seuils.
+     ok ≤ plafond de la Prio < cible ≤ budget < plafond ≤ tolérance < max (ajouts manuels seulement).
+     Autres (Prio 5) : pas de plafond propre, aucun drapeau jusqu'au budget. */
+  function drapeauPrix(a){
+    if (!estNb(a.prix) || !estNb(BUDGET)) return null;
+    var tc = a.prix * (1 + NOTAIRE), pl = plafondPrio(a), tol = estNb(TOLERANCE) ? TOLERANCE : BUDGET, n = "P" + a.prio;
+    if (tc <= BUDGET){
+      if (pl === null) return null;
+      return tc <= pl ? {niveau:"ok", texte:"Sous le plafond " + n, court:"Sous " + n}
+                      : {niveau:"cible", texte:"Au-dessus du plafond " + n, court:"Au-dessus " + n};
+    }
+    if (tc > tol && a.ajoutManuel === true) return {niveau:"max", texte:"Hors budget · gardée, ajoutée par vous", court:"Hors budget"};
+    return {niveau:"plafond", texte:"Au-delà du budget", court:"Au-delà budget"};
   }
+  function drapeau(a){ var d = drapeauPrix(a); return d ? d.texte : null; }
+  /* Ligne d'aide de la fiche, sous le drapeau. */
+  function aidePrix(a){
+    var d = drapeauPrix(a), pl = plafondPrio(a);
+    if (pl !== null && d && (d.niveau === "ok" || d.niveau === "cible")) return "Plafond indicatif P" + a.prio + " : " + kEuros(pl) + " frais compris";
+    if (!estNb(BUDGET)) return null;
+    return "Budget " + kEuros(BUDGET) + " frais compris" + (estNb(TOLERANCE) && TOLERANCE > BUDGET ? ", toléré jusqu'à " + kEuros(TOLERANCE) : "");
+  }
+  /* Pastille DPE aux couleurs officielles (taille : carte, fiche, comp). */
+  function pastilleDpe(a, taille){
+    var d = dpe(a);
+    return d ? el("span", {classe:"dpe dpe-" + d.toLowerCase() + " dpe-" + (taille || "carte"), role:"img", "aria-label":"DPE " + d, texte:d}) : null;
+  }
+  function nomPrio(n){ return n === AUTRES ? (txt(PRIOS[AUTRES] && PRIOS[AUTRES].zone) || "Autres") : "Prio " + n; }
+  function courtPrio(n){ return n === AUTRES ? nomPrio(n) : n ? "P" + n : "P?"; }
+  /* Ajout manuel : la source affichée est le domaine du lien, pas « Ajout de … ». */
+  function domaine(u){ var m = (lienSur(u) || "").match(/^https?:\/\/(?:www\.)?([^\/?#:]+)/i); return m ? m[1].toLowerCase() : ""; }
+  function sourceAffichee(a){ return a.ajoutManuel ? (domaine(a.lien) || "Ajout manuel") : txt(a.source); }
   function etatNorm(a){
     var e = txt(a.etat).toLowerCase();
     if (/rafra/.test(e)) return "À rafraîchir";
@@ -130,7 +158,7 @@
     return {lo:Math.min(lo, hi), hi:Math.max(lo, hi)};
   }
   function taxeMois(a){ var t = annuel(a.taxeFonciere); return t !== null ? arrondi5(t / 12) : null; }
-  function fourchette(f){ return f.lo === f.hi ? nb(f.lo) + " €" : nb(f.lo) + " à " + nb(f.hi) + " €"; }
+  function plage(f){ return f.lo === f.hi ? nb(f.lo) + " €" : nb(f.lo) + " à " + nb(f.hi) + " €"; }
   function adequation(a){ return estNb(a.score) ? Math.round(a.score) : null; }
 
   /* Ligne de critères des cartes. L'état n'y figure que s'il appelle une vigilance. */
@@ -141,7 +169,7 @@
     p.push(estNb(a.chambres) ? a.chambres + " ch." : "ch. non précisé");
     p.push(estNb(a.terrain) ? "Jardin " + nb(a.terrain) + " m²" : "jardin ?");
     if (court) return p.join(" · ");
-    p.push(dpe(a) ? "DPE " + dpe(a) : "DPE ?");
+    /* Le DPE n'est plus dans le texte : la pastille colorée le remplace. */
     if (a.garage === true) p.push("Garage"); else if (a.garage === false) p.push("Sans garage");
     var e = etatNorm(a);
     if (e === "À rafraîchir" || e === "À rénover") p.push(e.toLowerCase());
@@ -158,7 +186,7 @@
   };
   var D = null;
   var UI = {viewMode:"cards", sort:"pertinence", favoris:false, nouveau:false, compareIds:[], prio:1, favFiltre:"tous", resumeOuvert:false};
-  var FILTRES_FAV = ["tous", "jl", "j", "l"];
+  var FILTRES_FAV = ["tous", "cdc", "p1", "p2"];
   (function(){
     try {
       var u = JSON.parse(lsGet(LS_UI) || "{}");
@@ -166,7 +194,7 @@
       if (TRIS.some(function(t){ return t.id === u.sort; })) UI.sort = u.sort;
       UI.favoris = u.favoris === true; UI.nouveau = u["new"] === true;
       if (Array.isArray(u.compareIds)) UI.compareIds = u.compareIds.filter(estNb).slice(0, MAX_COMPARER);
-      if ([1,2,3,4].indexOf(u.prio) >= 0) UI.prio = u.prio;
+      if (NUMS_PRIO.indexOf(u.prio) >= 0) UI.prio = u.prio;
       if (FILTRES_FAV.indexOf(u.favFiltre) >= 0) UI.favFiltre = u.favFiltre;
       UI.resumeOuvert = u.resumeOuvert === true;
     } catch(e){}
@@ -176,15 +204,21 @@
       favFiltre:UI.favFiltre, resumeOuvert:UI.resumeOuvert}));
   }
 
-  /* Favori à deux (V3.6) : une colonne par personne ; les deux = coup de cœur. */
-  var PERSONNES = [{id:"jeremy", cle:"favoriJeremy", nom:"Jérémy", init:"J"}, {id:"line", cle:"favoriLine", nom:"Line", init:"L"}];
-  function aimeJ(a){ return a.favoriJeremy === true; }
-  function aimeL(a){ return a.favoriLine === true; }
-  function estFavori(a){ return aimeJ(a) || aimeL(a); }
-  function estCoupDeCoeur(a){ return aimeJ(a) && aimeL(a); }
+  /* Favori à deux : une colonne « Favori <Prénom> » par personne dans le tableau ; tous = coup de cœur.
+     PERSONNES = [{id:"p1", nom, init}, …] arrive de l'API ; une annonce porte aimeePar = ["p1", …]. */
+  function aime(a, p){ return !!p && Array.isArray(a.aimeePar) && a.aimeePar.indexOf(p.id) >= 0; }
+  function qui(a){ return PERSONNES.filter(function(p){ return aime(a, p); }); }
+  function estFavori(a){ return qui(a).length > 0; }
+  function estCoupDeCoeur(a){ return PERSONNES.length > 1 && qui(a).length === PERSONNES.length; }
+  function seul(a, p){ return aime(a, p) && qui(a).length === 1; }
   function aimeePar(a){
-    var n = PERSONNES.filter(function(p){ return a[p.cle] === true; }).map(function(p){ return p.nom; });
+    var n = qui(a).map(function(p){ return p.nom; });
     return n.length ? "Aimée par " + n.join(" et ") : "";
+  }
+  function appliquerPersonnes(l){
+    PERSONNES = (Array.isArray(l) ? l : []).filter(function(p){ return p && txt(p.id) && txt(p.nom); }).slice(0, 2).map(function(p, i){
+      return {id:txt(p.id), nom:txt(p.nom), init:txt(p.nom).charAt(0).toUpperCase(), rang:i + 1};
+    });
   }
   function annonces(){ return D ? D.annonces.filter(function(a){ return !a.masquee; }) : []; }
   function enLice(){ return annonces().filter(function(a){ return !a.corbeille; }); }
@@ -304,6 +338,19 @@
         test.base = d; return d;
       });
     },
+    /* Même découpage que pourSite_ (Code.gs) : ajout manuel d'après la Source, écarts « Écart : » à part. */
+    pourSite:function(a){
+      a = test.copie(a);
+      if (/^\s*ajout de\b/i.test(txt(a.source))) a.ajoutManuel = true;
+      if (Array.isArray(a.vigilance)){
+        var re = /^\s*[ée]cart\s*:\s*/i;
+        var e = a.vigilance.filter(function(t){ return re.test(t); }).map(function(t){ return t.replace(re, "").trim(); });
+        var o = a.vigilance.filter(function(t){ return !re.test(t); });
+        if (e.length) a.vigilanceCriteres = e;
+        if (o.length) a.vigilance = o; else delete a.vigilance;
+      }
+      return a;
+    },
     attendre:function(v){ return new Promise(function(ok){ setTimeout(function(){ ok(v); }, 600); }); },
     /* ?echec=1 : le tableau est injoignable ; ?echec=ecriture : seules les écritures échouent. */
     echouer:function(ecriture){
@@ -313,7 +360,7 @@
     lire:function(){
       return test.charger().then(function(d){
         if (test.echouer()) return test.attendre().then(function(){ throw erreur("Le serveur ne répond pas (échec simulé)."); });
-        var r = test.copie({rapport:d.rapport, reglages:d.reglages, annonces:d.annonces.filter(function(a){ return !a.masquee; }), journal:d.journal || []});
+        var r = test.copie({rapport:d.rapport, reglages:d.reglages, personnes:d.personnes || [], annonces:d.annonces.filter(function(a){ return !a.masquee; }).map(test.pourSite), journal:d.journal || []});
         r.ok = true; r.lu = new Date().toISOString();
         return test.attendre(r);
       });
@@ -375,7 +422,7 @@
         }
         if (c.action === "note"){
           if (txt(c.texte)) a.notes = txt(c.texte); else delete a.notes;
-          return test.attendre({ok:true, annonce:test.copie(a)});
+          return test.attendre({ok:true, annonce:test.pourSite(a)});
         }
         if (c.action === "journal"){
           if (!txt(c.texte)) return test.attendre().then(function(){ throw erreur("Commentaire vide."); });
@@ -384,14 +431,14 @@
         /* Même règle que changerStatut_ (Code.gs) : une ligne de journal seulement si le statut change. */
         var t = null;
         var pf = PERSONNES.filter(function(x){ return x.id === c.qui; })[0];
-        if (c.action === "favori" && !pf) return test.attendre().then(function(){ throw erreur("Paramètre « qui » manquant ou inconnu (jeremy ou line)."); });
-        if (c.action === "favori" && !!c.valeur !== (a[pf.cle] === true)) t = ["Favori", (c.valeur ? "Ajoutée aux favoris de " : "Retirée des favoris de ") + pf.nom];
+        if (c.action === "favori" && !pf) return test.attendre().then(function(){ throw erreur("Paramètre « qui » manquant ou inconnu."); });
+        if (c.action === "favori" && !!c.valeur !== aime(a, pf)) t = ["Favori", (c.valeur ? "Ajoutée aux favoris de " : "Retirée des favoris de ") + pf.nom];
         else if (c.action === "contact" && !!c.valeur !== !!a.enContact) t = ["Contact", c.valeur ? "Passée en contact" : "Retirée du suivi"];
         else if (c.action === "corbeille" && !a.corbeille) t = ["Corbeille", "Mise à la corbeille" + (txt(c.raison) ? " : " + txt(c.raison) : "")];
         else if (c.action === "restaurer" && a.corbeille) t = ["Restauration", "Restaurée"];
         appliquerStatut(a, c.action, c.valeur, new Date().toISOString(), c.qui);
         if (c.action === "corbeille" && txt(c.raison)) a.raisonCorbeille = txt(c.raison);
-        return test.attendre({ok:true, annonce:test.copie(a), journal:t ? [test.copie(journaliser(t[0], t[1]))] : []});
+        return test.attendre({ok:true, annonce:test.pourSite(a), journal:t ? [test.copie(journaliser(t[0], t[1]))] : []});
       });
     }
   };
@@ -411,7 +458,7 @@
   }
   function analyserRoute(t){
     var m;
-    if ((m = t.match(/^prio\/?([1-4])$/))) return {nom:"prio", n:Number(m[1])};
+    if ((m = t.match(/^prio\/?([1-5])$/))) return {nom:"prio", n:Number(m[1])};
     if ((m = t.match(/^fiche\/(\d+)$/))) return {nom:"fiche", num:Number(m[1])};
     if (/^(favoris|suivi|comparer|ajouter|corbeille)$/.test(t)) return {nom:t};
     return {nom:"accueil"};
@@ -475,11 +522,11 @@
       return c && Array.isArray(c.annonces) ? c : null;
     } catch(e){ return null; }
   }
-  function ecrireCache(){ if (D) lsSet(LS_CACHE, JSON.stringify({lu:D.lu, rapport:D.rapport, reglages:D.reglages, annonces:D.annonces, journal:D.journal.filter(function(e){ return !e.local; })})); }
+  function ecrireCache(){ if (D) lsSet(LS_CACHE, JSON.stringify({lu:D.lu, rapport:D.rapport, reglages:D.reglages, personnes:D.personnes, annonces:D.annonces, journal:D.journal.filter(function(e){ return !e.local; })})); }
   function appliquerReglages(g){
     g = g || {};
-    PLAFOND = estNb(g.plafond) ? g.plafond : null;
-    PLAFOND_MAX = estNb(g.plafondMax) ? g.plafondMax : PLAFOND;
+    BUDGET = estNb(g.budget) ? g.budget : null;
+    TOLERANCE = estNb(g.tolerance) ? g.tolerance : BUDGET;
     PRIOS = g.prios && typeof g.prios === "object" ? g.prios : {};
     CRITERES = Array.isArray(g.criteres) ? g.criteres.map(txt).filter(Boolean) : [];
   }
@@ -514,28 +561,36 @@
     });
     /* Les commentaires pas encore confirmés par le tableau restent affichés. */
     var enCours = D ? D.journal.filter(function(e){ return e.local; }) : [];
-    D = {annonces:liste, rapport:r.rapport || {}, reglages:r.reglages || null, lu:r.lu || new Date().toISOString(),
-      journal:(Array.isArray(r.journal) ? r.journal : []).concat(enCours)};
+    /* Jamais de pépite en Prio 5 (Autres), quelle que soit la donnée. */
+    liste.forEach(function(a){ if (a.prio === AUTRES) a.pepite = false; });
+    D = {annonces:liste, rapport:r.rapport || {}, reglages:r.reglages || null, personnes:Array.isArray(r.personnes) ? r.personnes : [],
+      lu:r.lu || new Date().toISOString(), journal:(Array.isArray(r.journal) ? r.journal : []).concat(enCours)};
     appliquerReglages(D.reglages);
+    appliquerPersonnes(D.personnes);
     nettoyerComparer();
   }
 
   /* ---------- Écritures (optimistes) ---------- */
   function appliquerStatut(a, action, valeur, maintenant, qui){
-    if (action === "favori"){ PERSONNES.forEach(function(p){ if (p.id === qui) a[p.cle] = !!valeur; }); }
+    if (action === "favori" && qui){
+      var l = (Array.isArray(a.aimeePar) ? a.aimeePar : []).filter(function(id){ return id !== qui; });
+      if (valeur) l.push(qui);
+      l.sort();
+      if (l.length) a.aimeePar = l; else delete a.aimeePar;
+    }
     else if (action === "contact"){
       a.enContact = !!valeur;
       if (valeur){ if (!a.enContactDepuis) a.enContactDepuis = maintenant; }
       else delete a.enContactDepuis;
     } else if (action === "corbeille"){
       if (!a.corbeille) a.corbeilleLe = maintenant;
-      a.corbeille = true; a.favoriJeremy = false; a.favoriLine = false; a.enContact = false; delete a.enContactDepuis;
+      a.corbeille = true; delete a.aimeePar; a.enContact = false; delete a.enContactDepuis;
     } else if (action === "restaurer"){
       a.corbeille = false; delete a.corbeilleLe; delete a.raisonCorbeille;
     }
     a.statutLe = maintenant;
   }
-  /* extra : {raison} pour la corbeille, {qui:"jeremy"|"line"} pour un favori. */
+  /* extra : {raison} pour la corbeille, {qui:"p1"|"p2"} pour un favori. */
   function changerStatut(a, action, valeur, apres, extra){
     extra = extra || {};
     var raison = extra.raison, num = a.num, avant = {};
@@ -574,7 +629,7 @@
     });
   }
   /* « Qui l'aime ? » : chaque interrupteur écrit tout de suite (optimiste, même file par annonce). */
-  function basculerFavoriDe(a, p){ if (!a.corbeille) changerStatut(a, "favori", a[p.cle] !== true, null, {qui:p.id}); }
+  function basculerFavoriDe(a, p){ if (!a.corbeille) changerStatut(a, "favori", !aime(a, p), null, {qui:p.id}); }
   function basculerContact(a){ if (!a.corbeille) changerStatut(a, "contact", !a.enContact); }
   function mettreCorbeille(a, raison){
     changerStatut(a, "corbeille", true, function(){
@@ -582,7 +637,7 @@
       message("Mise à la corbeille");
     }, {raison:raison});
   }
-  function restaurer(a){ changerStatut(a, "restaurer", true, function(){ message("Restaurée dans la Prio " + a.prio); }); }
+  function restaurer(a){ changerStatut(a, "restaurer", true, function(){ message("Restaurée dans " + (a.prio === AUTRES ? nomPrio(AUTRES) : "la Prio " + a.prio)); }); }
   /* Corbeille : fenêtre de confirmation, avec une raison facultative (colonne « Raison corbeille »). */
   function boutonCorbeille(a, classe, contenu){
     return el("button", {type:"button", classe:classe, "aria-label":"Mettre à la corbeille", "aria-haspopup":"dialog",
@@ -622,10 +677,10 @@
   });
   function lignesQuiAime(a){
     return PERSONNES.map(function(p){
-      var on = a[p.cle] === true;
+      var on = aime(a, p);
       return el("button", {type:"button", classe:"qa-ligne interrupteur", role:"switch", "aria-checked":on ? "true" : "false",
         onclick:function(){ if (S.quiAime) S.quiAime.focus = PERSONNES.indexOf(p); basculerFavoriDe(a, p); }}, [
-        el("span", {classe:"pastille pastille-" + p.id, "aria-hidden":"true", texte:p.init}),
+        el("span", {classe:"pastille pastille-" + p.rang, "aria-hidden":"true", texte:p.init}),
         el("span", {classe:"qa-nom", texte:p.nom}),
         el("span", {classe:"switch" + (on ? " on" : ""), "aria-hidden":"true"}, [el("span", {classe:"switch-curseur"}, [ico("heart", true)])])
       ]);
@@ -856,17 +911,18 @@
   /* ---------- Briques d'affichage ---------- */
   function tags(a){
     var t = [];
-    if (estCoupDeCoeur(a)) t.push(tagCoupDeCoeur());
-    if (a.pepite) t.push(el("span", {classe:"tag tag-pepite", texte:"Pépite"}));
+    /* Ordre fixe : New › Coup de cœur › Pépite (jamais de Pépite en Autres). */
     if (estNew(a)) t.push(el("span", {classe:"tag tag-new", texte:"New"}));
+    if (estCoupDeCoeur(a)) t.push(tagCoupDeCoeur());
+    if (a.pepite && a.prio !== AUTRES) t.push(el("span", {classe:"tag tag-pepite", texte:"Pépite"}));
     return t.length ? el("div", {classe:"tags"}, t) : null;
   }
   function tagCoupDeCoeur(){ return el("span", {classe:"tag tag-cdc", texte:"Coup de cœur"}); }
-  /* Initiales J / L sous le cœur (J fond encre, L fond accent). */
+  /* Initiales sous le cœur (1re personne fond encre, 2e fond accent). */
   function initiales(a){
-    var l = PERSONNES.filter(function(p){ return a[p.cle] === true; });
+    var l = qui(a);
     if (!l.length) return null;
-    return el("span", {classe:"initiales", "aria-hidden":"true"}, l.map(function(p){ return el("span", {classe:"ini ini-" + p.id, texte:p.init}); }));
+    return el("span", {classe:"initiales", "aria-hidden":"true"}, l.map(function(p){ return el("span", {classe:"ini ini-" + p.rang, texte:p.init}); }));
   }
   function repli(){ return el("div", {classe:"repli"}, [ico("maison"), el("span", {texte:"Sans photo"})]); }
   function image(a, o){
@@ -929,7 +985,10 @@
     return el("button", {type:"button", classe:classe, "aria-label":"Partager l'annonce n°" + a.num,
       onclick:function(e){ e.stopPropagation(); partager(a); }}, [ico("partager")]);
   }
-  function badgePrio(a){ return el("span", {classe:"badge-prio", texte:a.prio ? "P" + a.prio : "P?"}); }
+  function badgePrio(a){
+    if (a.prio === AUTRES) return el("span", {classe:"badge-prio badge-autres"}, [el("span", {"aria-hidden":"true", texte:"📌 "}), nomPrio(AUTRES)]);
+    return el("span", {classe:"badge-prio", texte:courtPrio(a.prio)});
+  }
   function caseComparer(a){
     var coche = UI.compareIds.indexOf(a.num) >= 0, plein = !coche && UI.compareIds.length >= MAX_COMPARER;
     return el("label", {classe:"case-comparer" + (plein ? " desactive" : ""), onclick:function(e){ e.stopPropagation(); }}, [
@@ -950,19 +1009,31 @@
     noeud.addEventListener("keydown", function(e){ if ((e.key === "Enter" || e.key === " ") && e.target === noeud){ e.preventDefault(); ouvrirFiche(num); } });
     return noeud;
   }
-  /* Niveau du drapeau, pour sa couleur : ok, cible, plafond, max. */
-  function niveauDrapeau(a){
-    if (!estNb(a.prix) || !estNb(PLAFOND) || !estNb(PLAFOND_MAX)) return null;
-    var tc = Math.round(a.prix * (1 + NOTAIRE) / 1000) * 1000, P = PRIOS[a.prio];
-    return tc > PLAFOND_MAX ? "max" : tc > PLAFOND ? "plafond" : (P && tc > P.cibleMax) ? "cible" : "ok";
-  }
-  function pastilleDrapeau(a){
-    var d = drapeau(a);
-    return d ? el("span", {classe:"drapeau dr-" + niveauDrapeau(a), texte:d}) : null;
+  /* Drapeau de prix (classes dr-ok, dr-cible, dr-plafond, dr-max). */
+  function pastilleDrapeau(a, court){
+    var d = drapeauPrix(a);
+    return d ? el("span", {classe:"drapeau dr-" + d.niveau, texte:court ? d.court : d.texte}) : null;
   }
   function evaluation(a){
     var s = adequation(a);
-    return el("div", {classe:"carte-eval"}, [pastilleDrapeau(a), s !== null ? el("span", {classe:"score", texte:"Adéquation " + s}) : null]);
+    return el("div", {classe:"carte-eval"}, [s !== null ? el("span", {classe:"score", texte:"Adéquation " + s}) : null]);
+  }
+  /* Ligne « ≈ X k€ frais compris » + drapeau, sous le prix. */
+  function ligneFraisCompris(a){
+    var fc = fraisCompris(a);
+    return fc ? el("div", {classe:"carte-fc"}, [el("span", {texte:"≈ " + kEuros(fc) + " frais compris"}), pastilleDrapeau(a)]) : null;
+  }
+  /* Ligne des critères : texte, puis pastille DPE calée à droite. */
+  function ligneCriteres(a, court){
+    return el("div", {classe:"carte-crit"}, [el("span", {texte:criteres(a, court)}), pastilleDpe(a, "carte")]);
+  }
+  /* 1re ligne du corps : Prio › En contact › source (seule la source se tronque). */
+  function ligneMeta(a, sansContact){
+    return el("div", {classe:"carte-meta"}, [
+      badgePrio(a),
+      a.enContact && !sansContact ? el("span", {classe:"tag tag-contact"}, [ico("phone"), "En contact"]) : null,
+      el("span", {classe:"source", texte:sourceAffichee(a) || "Source inconnue"})
+    ]);
   }
 
   /* ---------- Cartes et lignes ---------- */
@@ -970,10 +1041,11 @@
     var choisie = S.route.nom === "fiche" && S.route.num === a.num && S.bureau;
     var m2 = prixM2(a);
     var corps = el("div", {classe:"carte-corps"}, [
-      el("div", {classe:"carte-meta"}, [badgePrio(a), el("span", {classe:"source", texte:txt(a.source) || "Source inconnue"})]),
-      el("div", {classe:"carte-prix"}, [el("span", {texte:estNb(a.prix) ? euros(a.prix) : "Prix non précisé"}), S.bureau && m2 ? el("span", {classe:"m2", texte:nb(m2) + " €/m²"}) : null]),
-      el("div", {classe:"carte-lieu"}, [el("b", {texte:lieu(a)}), !S.bureau && m2 ? el("span", {classe:"m2", texte:" · " + nb(m2) + " €/m²"}) : null]),
-      el("div", {classe:"carte-crit", texte:criteres(a)}),
+      ligneMeta(a, suivi),
+      el("div", {classe:"carte-prix"}, [el("span", {texte:estNb(a.prix) ? euros(a.prix) : "Prix non précisé"}), m2 ? el("span", {classe:"m2", texte:nb(m2) + " €/m²"}) : null]),
+      ligneFraisCompris(a),
+      el("div", {classe:"carte-lieu"}, [el("b", {texte:lieuComplet(a)})]),
+      ligneCriteres(a),
       suivi
         ? el("div", {classe:"carte-contact"}, [ico("phone"), el("span", {texte:"En contact depuis le " + (dateCourte(a.enContactDepuis) || "?")})])
         : el("div", {classe:"carte-bas"}, [evaluation(a), caseComparer(a)]),
@@ -999,14 +1071,15 @@
           el("div", {classe:"carte-meta"}, [badgePrio(a), cdc ? tagCoupDeCoeur() : null]),
           el("div", {classe:"carte-prix", texte:estNb(a.prix) ? euros(a.prix) : "Prix non précisé"}),
           el("div", {classe:"carte-lieu"}, [el("b", {texte:lieu(a)})]),
-          el("div", {classe:"carte-crit", texte:criteres(a, true)}),
+          ligneCriteres(a, true),
           el("div", {classe:"carte-aimee", texte:aimeePar(a)})
         ])
       : el("div", {classe:"carte-corps"}, [
-          el("div", {classe:"carte-meta"}, [badgePrio(a), el("span", {classe:"source", texte:txt(a.source) || "Source inconnue"})]),
-          el("div", {classe:"carte-prix"}, [el("span", {texte:estNb(a.prix) ? euros(a.prix) : "Prix non précisé"})]),
-          el("div", {classe:"carte-lieu"}, [el("b", {texte:lieu(a)}), m2 ? el("span", {classe:"m2", texte:" · " + nb(m2) + " €/m²"}) : null]),
-          el("div", {classe:"carte-crit", texte:criteres(a)}),
+          ligneMeta(a),
+          el("div", {classe:"carte-prix"}, [el("span", {texte:estNb(a.prix) ? euros(a.prix) : "Prix non précisé"}), m2 ? el("span", {classe:"m2", texte:nb(m2) + " €/m²"}) : null]),
+          ligneFraisCompris(a),
+          el("div", {classe:"carte-lieu"}, [el("b", {texte:lieuComplet(a)})]),
+          ligneCriteres(a),
           el("div", {classe:"carte-aimee", texte:aimeePar(a)})
         ]);
     var art = el("article", {classe:"carte carte-fav" + (S.bureau ? " carte-h" : "") + (cdc ? " carte-cdc" : ""), "aria-label":lieu(a) + ", " + (estNb(a.prix) ? euros(a.prix) : "prix non précisé")}, [
@@ -1042,7 +1115,7 @@
         el("td", {texte:estNb(a.surface) ? nb(a.surface) + " m²" : "—"}),
         el("td", {texte:estNb(a.chambres) ? String(a.chambres) : "—"}),
         el("td", null, [tags(a)]),
-        el("td", {classe:"t-gris", texte:"P" + a.prio + " · " + (txt(a.source) || "—")}),
+        el("td", {classe:"t-gris", texte:courtPrio(a.prio) + " · " + (sourceAffichee(a) || "—")}),
         el("td", {classe:"t-coeur"}, [coeur(a)])
       ]), a.num));
     });
@@ -1119,25 +1192,38 @@
     var panneau = S.bureau && S.route.nom === "fiche" ? panneauFiche() : null;
     var col = el("div", {classe:"col-liste"}, [type === "prio" ? rappelPrio(n) : null, barreOutils(type, liste.length)]);
     if (!D) col.appendChild(squelettes(UI.viewMode));
+    else if (type === "prio" && n === AUTRES && !base.length){
+      /* Autres vide : un message et un seul lien d'action. */
+      col.appendChild(el("div", {classe:"vide-autres"}, [
+        el("p", {texte:"Aucune annonce ici. Les liens que vous ajoutez hors de nos secteurs apparaîtront dans cet onglet."}),
+        el("button", {type:"button", classe:"btn btn-contour", onclick:function(){ aller({nom:"ajouter"}); }}, [ico("plus"), el("span", {texte:"Ajouter des annonces"})])
+      ]));
+    }
     else if (!liste.length){
       var filtre = UI.favoris || (type === "prio" && UI.nouveau);
       col.appendChild(el("p", {classe:"vide", texte:filtre ? "Aucune annonce ne correspond aux filtres." :
-        type === "suivi" ? "Aucune annonce en contact. Utilisez « Contact » dans une fiche pour la suivre ici." : "Aucune annonce en Prio " + n + " pour l'instant."}));
+        type === "suivi" ? "Aucune annonce en contact. Utilisez « Contact » dans une fiche pour la suivre ici." : "Aucune annonce en " + nomPrio(n) + " pour l'instant."}));
     }
     else if (UI.viewMode === "list") col.appendChild(S.bureau ? tableauBureau(liste) : el("div", {classe:"lignes"}, liste.map(ligneMobile)));
     else col.appendChild(el("div", {classe:"cartes" + (type === "suivi" ? " cartes-suivi" : "")}, liste.map(function(a){ return carte(a, type === "suivi"); })));
     if (S.bureau && type === "prio" && UI.compareIds.length) col.appendChild(bandeauComparer());
     return el("div", {classe:"vue-liste" + (panneau ? " avec-panneau" : "")}, [col, panneau]);
   }
-  /* Rappel de la Prio en tête de liste : zone et cible (frais compris), venus de l'onglet Réglages. */
+  /* Rappel de la Prio en tête de liste : zone et plafond indicatif (frais compris), venus de l'onglet Réglages. */
   function rappelPrio(n){
+    if (n === AUTRES){
+      return el("div", {classe:"tete-autres"}, [
+        el("h2", null, [el("span", {"aria-hidden":"true", texte:"📌 "}), "Vos ajouts hors de nos secteurs"]),
+        el("p", {texte:"Pas de plafond propre" + (estNb(BUDGET) ? " · repère : budget de " + kEuros(BUDGET) + " frais compris" : "")})
+      ]);
+    }
     var P = PRIOS[n];
-    if (!P || (!txt(P.zone) && !estNb(P.cibleMax))) return null;
+    if (!P || (!txt(P.zone) && !estNb(P.plafond))) return null;
     return el("div", {classe:"rappel-prio"}, [
       el("span", {classe:"badge-prio", texte:"P" + n}),
       el("div", {classe:"rp-txt"}, [
         txt(P.zone) ? el("b", {texte:txt(P.zone)}) : null,
-        estNb(P.cibleMax) ? el("span", {texte:"Cible ≤ " + kEuros(P.cibleMax) + " frais compris"}) : null
+        estNb(P.plafond) ? el("span", {texte:"Plafond indicatif " + kEuros(P.plafond) + " frais compris"}) : null
       ])
     ]);
   }
@@ -1160,7 +1246,7 @@
   function ligneCout(lib, val, o){
     o = o || {};
     return el("div", {classe:"cout-ligne" + (o.total ? " total" : "")}, [
-      el("div", null, [el("span", {texte:lib}), o.sous ? el("small", {texte:o.sous}) : null]),
+      el("div", null, [el("span", {classe:o.dpe ? "lib-dpe" : null}, [lib, o.dpe || null]), o.sous ? el("small", {texte:o.sous}) : null]),
       val === null ? el("span", {classe:"inconnu", texte:o.inconnu || "non précisée"}) : el("b", {texte:val})
     ]);
   }
@@ -1176,9 +1262,9 @@
     var ch = el("div", {classe:"charges"}, [el("h4", {classe:"surtitre-sec", texte:"Charges selon l'annonce"})]);
     if (!en && tx === null) ch.appendChild(el("p", {classe:"inconnu", texte:"Charges non précisées dans l'annonce."}));
     else {
-      ch.appendChild(ligneCout("Énergie (estimation DPE)", en ? "≈ " + fourchette(en) + " / mois" : null));
+      ch.appendChild(ligneCout("Énergie", en ? "≈ " + plage(en) + " / mois" : null, {dpe:pastilleDpe(a, "fiche")}));
       ch.appendChild(ligneCout("Taxe foncière", tx !== null ? "≈ " + nb(tx) + " € / mois" : null));
-      if (en && tx !== null) ch.appendChild(ligneCout("Charges connues", "≈ " + fourchette({lo:en.lo + tx, hi:en.hi + tx}) + " / mois", {total:true, sous:"hors assurance"}));
+      if (en && tx !== null) ch.appendChild(ligneCout("Charges connues", "≈ " + plage({lo:en.lo + tx, hi:en.hi + tx}) + " / mois", {total:true, sous:"hors assurance"}));
     }
     sec.appendChild(ch);
     return sec;
@@ -1190,7 +1276,7 @@
     puce(estNb(a.pieces) ? pluriel(a.pieces, "pièce") : null, "Pièces non précisées");
     puce(estNb(a.chambres) ? pluriel(a.chambres, "chambre") : null, "Chambres non précisées");
     puce(estNb(a.terrain) ? "Jardin " + nb(a.terrain) + " m²" : null, "Jardin non précisé");
-    puce(dpe(a) ? "DPE " + dpe(a) : null, "DPE ?");
+    if (dpe(a)) p.push(el("span", {classe:"chip chip-dpe"}, [pastilleDpe(a, "fiche"), "DPE"])); else puce(null, "DPE non précisé");
     if (a.garage === true) puce("Garage"); else if (a.garage === false) puce("Sans garage");
     puce(etatNorm(a), "État non précisé");
     return el("div", {classe:"chips"}, p);
@@ -1205,7 +1291,8 @@
   function contenuFiche(a){
     var m2 = prixM2(a), s = adequation(a), fc = fraisCompris(a);
     var plus = Array.isArray(a.atouts) ? a.atouts : [], moins = Array.isArray(a.vigilance) ? a.vigilance : [];
-    var meta = ["n°" + a.num, txt(a.source), anciennete(a)].filter(Boolean).join(" · ");
+    var ecarts = (Array.isArray(a.vigilanceCriteres) ? a.vigilanceCriteres : []).map(txt).filter(Boolean);
+    var meta = ["n°" + a.num, sourceAffichee(a), anciennete(a)].filter(Boolean).join(" · ");
     return el("div", {classe:"fiche"}, [
       image(a, {classe:"fiche-img", direct:true}),
       el("div", {classe:"fiche-in"}, [
@@ -1214,7 +1301,12 @@
         a.enContact ? el("p", {classe:"fiche-etat-suivi"}, [ico("phone"), " En contact depuis le " + (dateCourte(a.enContactDepuis) || "?")]) : null,
         el("div", {classe:"fiche-prix"}, [el("span", {classe:"prix", texte:estNb(a.prix) ? euros(a.prix) : "Prix non précisé"}), m2 ? el("span", {classe:"m2", texte:nb(m2) + " €/m²"}) : null]),
         fc ? el("div", {classe:"fiche-fc"}, [el("b", {texte:"≈ " + kEuros(fc) + " frais compris"}), pastilleDrapeau(a)]) : null,
+        fc && aidePrix(a) ? el("p", {classe:"fiche-aide-prix", texte:aidePrix(a)}) : null,
         el("div", {classe:"fiche-lieu"}, [el("h2", {texte:lieuComplet(a)}), txt(a.titre) ? el("p", {texte:txt(a.titre)}) : null]),
+        ecarts.length ? el("div", {classe:"hors-criteres"}, [
+          el("p", {classe:"hc-titre", texte:"Hors de nos critères · " + pluriel(ecarts.length, "écart")}),
+          el("ul", {classe:"hc-liste"}, ecarts.map(function(t){ return el("li", {texte:t}); }))
+        ]) : null,
         el("div", {classe:"encart-adequation"}, [ico("cible"), el("div", null, [
           el("b", {texte:s !== null ? "Adéquation " + s + " / 100" : "Adéquation non notée"}),
           a.pepite ? el("small", {texte:"Pépite"}) : null
@@ -1225,9 +1317,12 @@
       S.fond.nom === "suivi" && !a.corbeille ? blocJournal(a) : null,
       a.corbeille ? null : blocNote(a),
       blocCout(a),
-      (plus.length || moins.length) ? el("div", {classe:"fiche-points"}, [
+      (plus.length || moins.length || ecarts.length) ? el("div", {classe:"fiche-points"}, [
         plus.length ? el("section", {classe:"fiche-sec atouts"}, [el("h3", {classe:"surtitre-sec", texte:"Atouts"}), el("ul", null, plus.map(function(p){ return el("li", null, [ico("check"), el("span", {texte:txt(p)})]); }))]) : null,
-        moins.length ? el("section", {classe:"fiche-sec vigilance"}, [el("h3", {classe:"surtitre-sec"}, [ico("alerte"), " Points de vigilance"]), el("ul", null, moins.map(function(p){ return el("li", null, [ico("alerte"), el("span", {texte:txt(p)})]); }))]) : null
+        (moins.length || ecarts.length) ? el("section", {classe:"fiche-sec vigilance"}, [el("h3", {classe:"surtitre-sec"}, [ico("alerte"), " Points de vigilance"]),
+          /* Les écarts à nos critères en tête, en gras, puis un filet, puis les autres points. */
+          ecarts.length ? el("ul", {classe:"vig-ecarts"}, ecarts.map(function(p){ return el("li", null, [ico("alerte"), el("span", {texte:p})]); })) : null,
+          moins.length ? el("ul", {classe:ecarts.length ? "vig-autres" : null}, moins.map(function(p){ return el("li", null, [ico("alerte"), el("span", {texte:txt(p)})]); })) : null]) : null
       ]) : null
     ]);
   }
@@ -1295,22 +1390,23 @@
     return el("div", {classe:"couche couche-fiche"}, [el("div", {classe:"voile", onclick:fermerFiche}), feuille]);
   }
   /* ---------- Favoris ---------- */
+  function personneDuFiltre(f){ return PERSONNES.filter(function(p){ return p.id === f; })[0] || null; }
   function favorisFiltres(){
-    var l = favoris(), f = UI.favFiltre;
-    if (f === "jl") return l.filter(estCoupDeCoeur);
-    if (f === "j") return l.filter(aimeJ);
-    if (f === "l") return l.filter(aimeL);
-    /* « Tous » : coups de cœur, puis Jérémy seul, puis Line seule. */
-    return l.filter(estCoupDeCoeur).concat(l.filter(function(a){ return aimeJ(a) && !aimeL(a); }), l.filter(function(a){ return aimeL(a) && !aimeJ(a); }));
+    var l = favoris(), f = UI.favFiltre, p = personneDuFiltre(f);
+    if (f === "cdc") return l.filter(estCoupDeCoeur);
+    if (p) return l.filter(function(a){ return aime(a, p); });
+    /* « Tous » : coups de cœur, puis chaque personne seule, dans l'ordre du tableau. */
+    return l.filter(estCoupDeCoeur).concat.apply(l.filter(estCoupDeCoeur), PERSONNES.map(function(x){ return l.filter(function(a){ return seul(a, x); }); }));
   }
   function filtresFavoris(){
     var l = favoris();
-    var defs = [
-      {id:"tous", n:l.length, contenu:[el("span", {texte:"Tous"})], lib:"Tous"},
-      {id:"jl", n:l.filter(estCoupDeCoeur).length, contenu:[el("span", {classe:"deux-coeurs", "aria-hidden":"true"}, [ico("heart", true), ico("heart", true)]), el("span", {texte:"J & L"})], lib:"Coups de cœur, Jérémy et Line"},
-      {id:"j", n:l.filter(aimeJ).length, contenu:[el("span", {classe:"pastille pastille-jeremy", "aria-hidden":"true", texte:"J"})], lib:"Favoris de Jérémy"},
-      {id:"l", n:l.filter(aimeL).length, contenu:[el("span", {classe:"pastille pastille-line", "aria-hidden":"true", texte:"L"})], lib:"Favoris de Line"}
-    ];
+    var defs = [{id:"tous", n:l.length, contenu:[el("span", {texte:"Tous"})], lib:"Tous"}];
+    if (PERSONNES.length > 1) defs.push({id:"cdc", n:l.filter(estCoupDeCoeur).length,
+      contenu:[el("span", {classe:"deux-coeurs", "aria-hidden":"true"}, [ico("heart", true), ico("heart", true)]), el("span", {texte:PERSONNES.map(function(p){ return p.init; }).join(" & ")})],
+      lib:"Coups de cœur, " + PERSONNES.map(function(p){ return p.nom; }).join(" et ")});
+    PERSONNES.forEach(function(p){
+      defs.push({id:p.id, n:l.filter(function(a){ return aime(a, p); }).length, contenu:[el("span", {classe:"pastille pastille-" + p.rang, "aria-hidden":"true", texte:p.init})], lib:"Favoris de " + p.nom});
+    });
     return el("div", {classe:"filtres-fav", role:"group", "aria-label":"Filtrer les favoris"}, [
       S.bureau ? el("span", {classe:"outils-nb", texte:D ? pluriel(l.length, "favori") : "Chargement…"}) : null
     ].concat(defs.map(function(d){
@@ -1329,19 +1425,21 @@
     var box = el("div", {classe:"favoris"}, [filtresFavoris()]);
     if (!D){ box.appendChild(squelettes("cards")); return box; }
     var tous = favoris(), f = UI.favFiltre;
+    if (f !== "tous" && f !== "cdc" && !personneDuFiltre(f)) f = UI.favFiltre = "tous";
     if (!tous.length){ box.appendChild(el("p", {classe:"vide", texte:"Pas encore de favori. Touchez le cœur d'une annonce pour dire qui l'aime."})); return box; }
     if (f === "tous"){
-      var cdc = tous.filter(estCoupDeCoeur), j = tous.filter(function(a){ return aimeJ(a) && !aimeL(a); }), l = tous.filter(function(a){ return aimeL(a) && !aimeJ(a); });
+      var cdc = tous.filter(estCoupDeCoeur), seules = PERSONNES.map(function(p){ return tous.filter(function(a){ return seul(a, p); }); });
       /* Une section vide n'est pas affichée (sectionFavoris renvoie null). */
+      /* Ordinateur : les favoris d'une seule personne regroupés sous « Prénom 1 · Prénom 2 ». */
       var secs = [sectionFavoris([ico("heart", true), " Coups de cœur"], cdc, "sec-cdc")].concat(S.bureau
-        ? [sectionFavoris(["Jérémy seul · Line seule"], j.concat(l))]
-        : [sectionFavoris(["Jérémy"], j), sectionFavoris(["Line"], l)]);
+        ? [sectionFavoris([PERSONNES.map(function(p){ return p.nom; }).join(" · ")], [].concat.apply([], seules))]
+        : PERSONNES.map(function(p, i){ return sectionFavoris([p.nom], seules[i]); }));
       secs.forEach(function(x){ if (x) box.appendChild(x); });
       return box;
     }
     var liste = favorisFiltres();
     if (!liste.length){
-      box.appendChild(el("p", {classe:"vide", texte:f === "jl" ? "Pas encore d'annonce qui vous plaise à tous les deux." : "Aucun favori de " + (f === "j" ? "Jérémy" : "Line") + " pour l'instant."}));
+      box.appendChild(el("p", {classe:"vide", texte:f === "cdc" ? "Pas encore d'annonce qui vous plaise à tous les deux." : "Aucun favori de " + personneDuFiltre(f).nom + " pour l'instant."}));
       return box;
     }
     box.appendChild(el("div", {classe:"cartes cartes-fav"}, liste.map(carteFavori)));
@@ -1357,9 +1455,9 @@
     return cliquable(el("article", {classe:"carte-pepite", "aria-label":lieu(a)}, [
       image(a, {coeurIndic:true}),
       el("div", {classe:"cp-corps"}, [
-        el("div", {classe:"cp-prix"}, [el("span", {texte:estNb(a.prix) ? euros(a.prix) : "Prix ?"}), el("b", {texte:"P" + a.prio})]),
-        el("div", {classe:"cp-lieu", texte:lieu(a)}),
-        el("div", {classe:"cp-crit", texte:criteres(a, true)})
+        el("div", {classe:"cp-prix"}, [el("span", {texte:estNb(a.prix) ? euros(a.prix) : "Prix ?"}), el("b", {texte:courtPrio(a.prio)})]),
+        el("div", {classe:"cp-lieu", texte:lieuComplet(a)}),
+        el("div", {classe:"cp-crit"}, [el("span", {texte:criteres(a, true)}), pastilleDpe(a, "carte")])
       ])
     ]), a.num);
   }
@@ -1426,10 +1524,17 @@
           el("b", {texte:D ? String(parPrio(n).length) : "—"}),
           el("span", {classe:"cp-txt"}, [
             P.zone ? el("small", {classe:"cp-zone", texte:P.zone}) : null,
-            P.cibleMax ? el("small", {texte:"cible ≤ " + kEuros(P.cibleMax)}) : null
+            estNb(P.plafond) ? el("small", {texte:"plafond " + kEuros(P.plafond)}) : null
           ])
         ]);
-      }))
+      }).concat([
+        /* Autres : ligne fine pleine largeur (mobile), 5e colonne plus étroite (ordinateur). */
+        el("button", {type:"button", classe:"cellule-prio cellule-autres", onclick:function(){ aller({nom:"prio", n:AUTRES}); }}, [
+          el("span", {classe:"cp-n badge-autres"}, [el("span", {"aria-hidden":"true", texte:"📌 "}), nomPrio(AUTRES)]),
+          el("b", {texte:D ? String(parPrio(AUTRES).length) : "—"}),
+          el("span", {classe:"cp-txt"}, [el("small", {texte:"Vos ajouts hors secteurs"}), S.bureau ? null : el("small", {texte:"sans plafond propre"})])
+        ])
+      ]))
     ]));
     p.appendChild(el("section", {classe:"bande bloc-criteres"}, [
       el("h2", {classe:"surtitre-sec", texte:"Nos critères"}),
@@ -1447,15 +1552,15 @@
     {lib:"Chambres", v:function(a){ return estNb(a.chambres) ? a.chambres : null; }, f:String, best:"max"},
     {lib:"Pièces", v:function(a){ return estNb(a.pieces) ? a.pieces : null; }, f:String},
     {lib:"Jardin", v:function(a){ return estNb(a.terrain) ? a.terrain : null; }, f:function(v){ return nb(v) + " m²"; }},
-    {lib:"DPE", v:dpe, f:String, best:"dpe"},
-    {lib:"Énergie / mois", v:energieMois, f:function(v){ return "≈ " + fourchette(v); }, best:"energie"},
+    {lib:"DPE", v:dpe, f:String, best:"dpe", noeud:function(v, a){ return pastilleDpe(a, "comp"); }},
+    {lib:"Énergie / mois", v:energieMois, f:function(v){ return "≈ " + plage(v); }, best:"energie"},
     {lib:"Taxe fonc. / mois", v:taxeMois, f:function(v){ return "≈ " + nb(v) + " €"; }, best:"min"},
     {lib:"Garage", v:function(a){ return a.garage === true ? "Oui" : a.garage === false ? "Non" : null; }, f:String, best:"oui"},
     {lib:"État", v:etatNorm, f:String},
     {lib:"Adéquation", v:adequation, f:function(v){ return v + " / 100"; }, best:"max"},
-    {lib:"Prix vs cible", v:drapeau, f:String},
-    {lib:"Prio", v:function(a){ return a.prio ? "P" + a.prio : null; }, f:String},
-    {lib:"Source", v:function(a){ var s = txt(a.source); return s ? s + (lienNonVerifie(a) ? " · lien non vérifié" : "") : null; }, f:String}
+    {lib:"Prix vs plafond", v:drapeau, f:String, noeud:function(v, a){ return pastilleDrapeau(a, true); }},
+    {lib:"Prio", v:function(a){ return a.prio ? courtPrio(a.prio) : null; }, f:String},
+    {lib:"Source", v:function(a){ var s = sourceAffichee(a); return s ? s + (lienNonVerifie(a) ? " · lien non vérifié" : "") : null; }, f:String}
   ];
   /* Gras = meilleure valeur. Une valeur absente n'est jamais la meilleure ; rien en gras si toutes se valent. */
   function meilleurs(ligne, valeurs){
@@ -1508,8 +1613,8 @@
           el("button", {type:"button", classe:"c-retirer", "aria-label":"Retirer n°" + a.num + " de la comparaison", onclick:function(){ basculerComparer(a.num); }}, [ico("x")])
         ]),
         el("button", {type:"button", classe:"c-lieu", onclick:function(){ ouvrirFiche(a.num); }}, [lieu(a)]),
-        el("p", {classe:"c-meta"}, ["P" + a.prio + " · n°" + a.num + " · " + (txt(a.source) || "—"),
-          estFavori(a) ? el("span", {classe:"c-coeur", "aria-label":aimeePar(a)}, [" · ", ico("heart", true), " " + PERSONNES.filter(function(p){ return a[p.cle] === true; }).map(function(p){ return p.init; }).join(" · ")]) : null])
+        el("p", {classe:"c-meta"}, [courtPrio(a.prio) + " · n°" + a.num + " · " + (sourceAffichee(a) || "—"),
+          estFavori(a) ? el("span", {classe:"c-coeur", "aria-label":aimeePar(a)}, [" · ", ico("heart", true), " " + qui(a).map(function(p){ return p.init; }).join(" · ")]) : null])
       ]);
     })).concat(vide ? [S.bureau
       ? el("th", {classe:"c-col c-libre", scope:"col"}, [el("b", {texte:"+ Ajouter une annonce"}), el("small", {texte:"Depuis vos favoris et le suivi"}), el("div", {classe:"candidats"}, listeCandidats())])
@@ -1519,6 +1624,7 @@
       var vals = sel.map(function(a){ var v = L.v(a); return v === undefined ? null : v; });
       var gras = meilleurs(L, vals);
       corps.appendChild(el("tr", null, [el("th", {classe:"c-lib", scope:"row", texte:L.lib})].concat(vals.map(function(v, i){
+        if (v !== null && L.noeud) return el("td", {classe:gras[i] ? "meilleur" : null}, [L.noeud(v, sel[i])]);
         return el("td", {classe:gras[i] ? "meilleur" : null, texte:v === null ? "—" : L.f(v)});
       })).concat(vide ? [el("td", {classe:"c-vide"})] : [])));
     });
@@ -1751,7 +1857,7 @@
     if (!D){ box.appendChild(squelettes("list")); return box; }
     if (!l.length){ box.appendChild(el("p", {classe:"vide", texte:"La corbeille est vide."})); return box; }
     function bouton(a){ return el("button", {type:"button", classe:"btn btn-contour", disabled:!!S.ops[a.num], onclick:function(){ restaurer(a); }}, ["Restaurer"]); }
-    function retiree(a){ return "Retirée le " + (dateCourte(a.corbeilleLe || a.statutLe) || "?") + " · P" + a.prio; }
+    function retiree(a){ return "Retirée le " + (dateCourte(a.corbeilleLe || a.statutLe) || "?") + " · " + courtPrio(a.prio); }
     if (S.bureau){
       box.appendChild(el("table", {classe:"tableau tableau-corbeille"}, [
         el("thead", null, [el("tr", null, ["Prix","Quartier","Bien","Retirée","Raison",""].map(function(t){ return el("th", {scope:"col", texte:t}); }))]),
@@ -1786,7 +1892,7 @@
   function surtitre(){
     if (!D && !S.echec) return "Chargement…";
     var r = S.route.nom === "fiche" ? S.fond : S.route;
-    if (r.nom === "prio") return "Prio " + r.n + " · " + pluriel(trier(filtrer(parPrio(r.n), true)).length, "annonce");
+    if (r.nom === "prio") return nomPrio(r.n) + " · " + pluriel(trier(filtrer(parPrio(r.n), true)).length, "annonce");
     if (r.nom === "suivi") return "Suivi · " + suivis().length + " en contact";
     if (r.nom === "favoris") return "Favoris · " + pluriel(favoris().length, "annonce");
     if (r.nom === "comparer") return "Comparer · " + UI.compareIds.length + " / " + MAX_COMPARER;
@@ -1818,7 +1924,12 @@
       return el("button", {type:"button", classe:"eb-prio" + (actif ? " actif" : ""), "aria-current":actif ? "page" : null, onclick:function(){ aller({nom:"prio", n:n}); }}, [
         "Prio " + n, el("small", {texte:D ? String(parPrio(n).length) : ""})
       ]);
-    })));
+    }).concat([
+      /* Autres : après un filet, plus discret, sans icône. */
+      el("span", {classe:"eb-filet", "aria-hidden":"true"}),
+      el("button", {type:"button", classe:"eb-prio eb-autres" + (p.nom === "prio" && p.n === AUTRES ? " actif" : ""), "aria-current":p.nom === "prio" && p.n === AUTRES ? "page" : null,
+        onclick:function(){ aller({nom:"prio", n:AUTRES}); }}, [nomPrio(AUTRES), el("small", {texte:D ? String(parPrio(AUTRES).length) : ""})])
+    ])));
     function lien(nom, lib, compte, classe){
       return el("button", {type:"button", classe:"eb-lien" + (classe ? " " + classe : "") + (p.nom === nom ? " actif" : ""), "aria-current":p.nom === nom ? "page" : null, onclick:function(){ aller({nom:nom}); }}, [lib, compte !== null ? el("small", {texte:compte}) : null]);
     }
@@ -1860,12 +1971,13 @@
     document.body.classList.toggle("sans-onglets", cache);
     if (cache) return;
     var p = pageActive();
-    [1,2,3,4].forEach(function(n){
-      var actif = p.nom === "prio" && p.n === n;
-      var l = D ? parPrio(n) : [], nn = l.filter(estNew).length;
-      nav.appendChild(el("button", {type:"button", classe:"onglet" + (actif ? " actif" : ""), "aria-current":actif ? "page" : null, onclick:function(){ aller({nom:"prio", n:n}); }}, [
-        el("b", {texte:"Prio " + n}),
-        el("small", {texte:D ? l.length + (nn ? " · " + nn + " new" : "") : "…"})
+    /* Nom + nombre d'annonces seulement (plus de compteur « new »). Autres : colonne étroite, sans icône. */
+    NUMS_PRIO.forEach(function(n){
+      var actif = p.nom === "prio" && p.n === n, nb = D ? parPrio(n).length : null, autres = n === AUTRES;
+      nav.appendChild(el("button", {type:"button", classe:"onglet" + (autres ? " onglet-autres" + (nb === 0 ? " vide" : "") : "") + (actif ? " actif" : ""),
+        "aria-current":actif ? "page" : null, "aria-label":nomPrio(n) + (nb !== null ? ", " + pluriel(nb, "annonce") : ""), onclick:function(){ aller({nom:"prio", n:n}); }}, [
+        el("b", {texte:nomPrio(n)}),
+        autres && nb === 0 ? null : el("small", {texte:nb !== null ? String(nb) : "…"})
       ]));
     });
   }

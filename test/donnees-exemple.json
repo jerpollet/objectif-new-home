@@ -14,30 +14,38 @@
     ]
   },
   "reglages": {
-    "plafond": 600000,
-    "plafondMax": 640000,
+    "budget": 600000,
+    "tolerance": 620000,
     "prios": {
       "1": {
-        "cibleMax": 560000,
+        "plafond": 600000,
         "zone": "Zone fictive A"
       },
       "2": {
-        "cibleMax": 540000,
+        "plafond": 570000,
         "zone": "Zone fictive B"
       },
       "3": {
-        "cibleMax": 480000,
+        "plafond": 550000,
         "zone": "Zone fictive C"
       },
       "4": {
-        "cibleMax": 440000,
+        "plafond": 520000,
         "zone": "Zone fictive D"
+      },
+      "5": {
+        "zone": "Autres"
       }
     },
     "criteres": [
       "Critère fictif 1",
       "Critère fictif 2",
-      "Critère fictif 3"
+      "Critère fictif 3",
+      "Critère fictif 4",
+      "Critère fictif 5",
+      "Critère fictif 6",
+      "Critère fictif 7",
+      "Critère fictif 8"
     ]
   },
   "ajouts": [
@@ -105,8 +113,10 @@
       "taxeFonciere": 1680,
       "lienVerifieLe": "2026-10-05T08:40:00.000Z",
       "notes": "Mémo fictif : agence Exemple, demander le diagnostic toiture.",
-      "favoriJeremy": true,
-      "favoriLine": true
+      "aimeePar": [
+        "p1",
+        "p2"
+      ]
     },
     {
       "num": 102,
@@ -134,8 +144,10 @@
       "resume": "Pépite fictive en favori, sans photo, avec énergie seule.",
       "energieMin": 2520,
       "energieMax": 3420,
-      "favoriJeremy": true,
-      "favoriLine": true
+      "aimeePar": [
+        "p1",
+        "p2"
+      ]
     },
     {
       "num": 103,
@@ -167,7 +179,7 @@
       "pieces": 4,
       "chambres": 3,
       "terrain": 250,
-      "dpe": "D",
+      "dpe": "A",
       "lien": "https://example.com/annonce-104",
       "source": "SeLoger",
       "repereeLe": "2026-10-04T08:00:00.000Z",
@@ -175,7 +187,9 @@
       "resume": "Annonce fictive sans quartier ni commune.",
       "etat": "À rénover",
       "lienVerifieLe": "2026-10-05T08:40:00.000Z",
-      "favoriLine": true
+      "aimeePar": [
+        "p2"
+      ]
     },
     {
       "num": 201,
@@ -239,7 +253,9 @@
       "score": 81,
       "resume": "Au-delà du plafond frais compris ; pépite New.",
       "lienVerifieLe": "2026-10-05T08:40:00.000Z",
-      "favoriLine": true
+      "aimeePar": [
+        "p2"
+      ]
     },
     {
       "num": 301,
@@ -260,7 +276,9 @@
       "resume": "Dans la cible Prio 3.",
       "etat": "Habitable en l'état",
       "lienVerifieLe": "2026-10-05T08:40:00.000Z",
-      "favoriJeremy": true
+      "aimeePar": [
+        "p1"
+      ]
     },
     {
       "num": 302,
@@ -343,6 +361,127 @@
       "titre": "Annonce masquée : ne doit jamais s'afficher",
       "lienVerifieLe": "2026-10-05T08:40:00.000Z",
       "raisonMasquee": "au-delà du plafond de 520 000 € frais compris"
+    },
+    {
+      "num": 204,
+      "prio": 2,
+      "commune": "Ville Exemple B",
+      "quartier": "Limite basse",
+      "prix": 557767,
+      "surface": 150,
+      "pieces": 6,
+      "chambres": 4,
+      "terrain": 500,
+      "dpe": "B",
+      "lien": "https://example.com/annonce-204",
+      "source": "Agence Exemple",
+      "repereeLe": "2026-10-01T18:00:00.000Z",
+      "score": 66,
+      "resume": "Frais compris exact 599 600 € : sous le budget fictif, donc pas de « Au-delà du budget ».",
+      "lienVerifieLe": "2026-10-05T08:40:00.000Z"
+    },
+    {
+      "num": 205,
+      "prio": 2,
+      "commune": "Ville Exemple B",
+      "quartier": "Limite haute",
+      "prix": 558512,
+      "surface": 150,
+      "pieces": 6,
+      "chambres": 4,
+      "terrain": 500,
+      "dpe": "C",
+      "lien": "https://example.com/annonce-205",
+      "source": "Agence Exemple",
+      "repereeLe": "2026-10-01T18:00:00.000Z",
+      "score": 64,
+      "resume": "Frais compris exact 600 400 € : affiché ≈ 600 k€, mais au-delà du budget fictif.",
+      "lienVerifieLe": "2026-10-05T08:40:00.000Z"
+    },
+    {
+      "num": 501,
+      "prio": 5,
+      "commune": "Bourg fictif",
+      "quartier": "Hors secteurs",
+      "prix": 567000,
+      "surface": 95,
+      "pieces": 4,
+      "chambres": 3,
+      "dpe": "F",
+      "garage": true,
+      "lien": "https://www.leboncoin.fr/ad/ventes_immobilieres/1234567890",
+      "source": "Ajout de Alpha",
+      "repereeLe": "2026-10-06T10:00:00.000Z",
+      "pepite": true,
+      "score": 42,
+      "titre": "Maison de bourg fictive, 4 pièces",
+      "atouts": [
+        "Garage"
+      ],
+      "vigilance": [
+        "Écart : Hors secteurs",
+        "Écart : Mitoyenne",
+        "Écart : DPE F",
+        "Écart : 95 m² (sous la surface minimale)",
+        "Écart : Pas de jardin",
+        "Toiture d'origine, à faire vérifier",
+        "Rue passante côté façade"
+      ],
+      "resume": "Ajout manuel fictif hors critères : entre le budget et la tolérance.",
+      "energieMin": 3480,
+      "energieMax": 4680,
+      "aimeePar": [
+        "p2"
+      ]
+    },
+    {
+      "num": 502,
+      "prio": 5,
+      "commune": "Hameau Exemple",
+      "quartier": "Hors secteurs",
+      "prix": 599000,
+      "surface": 150,
+      "pieces": 6,
+      "chambres": 5,
+      "terrain": 1500,
+      "dpe": "G",
+      "lien": "https://www.seloger.com/annonces/achat/maison/exemple/123456789.htm",
+      "source": "Ajout de Bravo",
+      "repereeLe": "2026-09-28T10:00:00.000Z",
+      "score": 55,
+      "vigilance": [
+        "Écart : Hors secteurs",
+        "Écart : DPE G",
+        "Chauffage fioul"
+      ],
+      "resume": "Ajout manuel fictif au-delà de la tolérance : gardé car c'est un ajout.",
+      "aimeePar": [
+        "p1",
+        "p2"
+      ]
+    },
+    {
+      "num": 503,
+      "prio": 5,
+      "commune": "Ville Exemple Est",
+      "quartier": "Hors secteurs",
+      "prix": 455000,
+      "surface": 120,
+      "pieces": 5,
+      "chambres": 4,
+      "terrain": 800,
+      "dpe": "E",
+      "lien": "https://www.pap.fr/annonces/maison-exemple-r400000009",
+      "source": "Ajout de Alpha",
+      "repereeLe": "2026-09-30T10:00:00.000Z",
+      "score": 61,
+      "vigilance": [
+        "Écart : Hors secteurs"
+      ],
+      "resume": "Ajout manuel fictif sous le budget : aucun drapeau en Autres.",
+      "aimeePar": [
+        "p1"
+      ]
     }
   ],
   "journal": [
@@ -350,7 +489,7 @@
       "le": "2026-10-01T09:00:00.000Z",
       "num": 101,
       "type": "Favori",
-      "texte": "Ajoutée aux favoris de Jérémy"
+      "texte": "Ajoutée aux favoris de Alpha"
     },
     {
       "le": "2026-10-03T08:00:00.000Z",
@@ -361,14 +500,14 @@
     {
       "le": "2026-10-03T08:20:00.000Z",
       "num": 101,
-      "par": "Personne B",
+      "par": "Bravo",
       "type": "Commentaire",
       "texte": "Appel à l'agence fictive : visite possible samedi matin."
     },
     {
       "le": "2026-10-04T17:45:00.000Z",
       "num": 101,
-      "par": "Personne A",
+      "par": "Alpha",
       "type": "Commentaire",
       "texte": "Visite confirmée samedi 10 h. Penser à demander la taxe foncière exacte."
     },
@@ -377,6 +516,16 @@
       "num": 103,
       "type": "Contact",
       "texte": "Passée en contact"
+    }
+  ],
+  "personnes": [
+    {
+      "id": "p1",
+      "nom": "Alpha"
+    },
+    {
+      "id": "p2",
+      "nom": "Bravo"
     }
   ]
 }

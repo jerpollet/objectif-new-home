@@ -11,7 +11,7 @@
   --plafond-fond:#fdebdd; --plafond-texte:#a4400d;
   --max-fond:#fde8e7; --max-texte:#b42318;
   --vigilance:#b5470f;
-  --jeremy:var(--encre); --line:var(--accent);
+  --personne-1:var(--encre); --personne-2:var(--accent);
   --r-carte:16px; --r-btn:12px; --r-pilule:999px;
   --ombre-1:0 1px 2px rgba(16,24,40,.05), 0 1px 3px rgba(16,24,40,.08);
   --ombre-2:0 4px 12px rgba(16,24,40,.08);
@@ -623,8 +623,8 @@ body.sans-onglets .message{bottom:calc(84px + env(safe-area-inset-bottom, 0px))}
 .initiales{position:absolute;top:29px;right:0;display:flex;z-index:2;pointer-events:none}
 .ini{width:17px;height:17px;border-radius:50%;border:1.5px solid #fff;display:grid;place-items:center;font-size:9px;font-weight:800;line-height:1;color:#fff}
 .ini + .ini{margin-left:-4px}
-.ini-jeremy{background:var(--jeremy)}
-.ini-line{background:var(--line)}
+.ini-1{background:var(--personne-1)}
+.ini-2{background:var(--personne-2)}
 .coeur-boite.indic{position:absolute}
 .coeur:not(.coeur-boite) .initiales{top:27px;right:2px}
 .act-coeur{position:relative;display:inline-grid;place-items:center}
@@ -639,8 +639,8 @@ body.sans-onglets .message{bottom:calc(84px + env(safe-area-inset-bottom, 0px))}
 
 /* Pastilles J / L (feuille, filtres). */
 .pastille{display:inline-grid;place-items:center;flex:none;border-radius:50%;color:#fff;font-weight:800;line-height:1}
-.pastille-jeremy{background:var(--jeremy)}
-.pastille-line{background:var(--line)}
+.pastille-1{background:var(--personne-1)}
+.pastille-2{background:var(--personne-2)}
 
 /* « Qui l'aime ? » : feuille du bas (mobile). */
 .couche-qa{z-index:65}
@@ -790,4 +790,81 @@ body.sans-onglets .message{bottom:calc(84px + env(safe-area-inset-bottom, 0px))}
 @media (min-width:1024px){
   .eb-ajouter{gap:0}
   .carte-pepite .img{aspect-ratio:16/9}
+}
+
+/* ---------- V3.7 : onglet Autres, pastilles DPE, drapeau de prix, écarts aux critères ---------- */
+/* Barre du bas : Prio 1 à 4 en colonnes égales, Autres en colonne fixe de 60 px derrière un filet. */
+.onglets-prio{grid-template-columns:repeat(4, minmax(0,1fr)) 60px}
+.onglet{min-width:0}
+.onglet-autres{border-left:1px solid var(--ligne);color:var(--gris-clair)}
+.onglet-autres b{font-size:14px;font-weight:700}
+.onglet-autres small{font-size:11px;color:var(--gris-clair)}
+.onglet-autres.vide b{opacity:.6}
+.onglet-autres.actif,.onglet-autres.actif small{color:var(--accent-600)}
+
+/* Chip de Prio « Autres » : gris. */
+.badge-prio.badge-autres,.cellule-prio .cp-n.badge-autres{background:var(--creux);color:var(--gris)}
+.cp-prix .badge-autres{background:var(--creux);color:var(--gris)}
+
+/* Badges : statuts sur la photo (laissent la place au cœur), infos en 1re ligne. */
+.carte .tags{right:104px}
+.carte-pepite .tags{right:56px}
+.carte-meta > *{flex:none}
+.carte-meta .source{flex:1 1 auto;min-width:0}
+.tag-contact{display:inline-flex;align-items:center;gap:4px;background:var(--accent-100);color:var(--accent-600);box-shadow:none}
+.tag-contact .ico{width:12px;height:12px}
+.carte-fc{display:flex;align-items:center;flex-wrap:wrap;gap:4px 10px;font-size:14px;color:var(--gris)}
+.carte-crit,.cp-crit{display:flex;align-items:center;gap:8px}
+.carte-crit > span:first-child,.cp-crit > span:first-child{min-width:0}
+.carte-crit .dpe,.cp-crit .dpe{margin-left:auto}
+.carte-prix .m2{margin-left:auto}
+
+/* Pastilles DPE aux couleurs officielles. */
+.dpe{display:inline-grid;place-items:center;flex:none;font-weight:800;line-height:1}
+.dpe-carte{width:20px;height:20px;border-radius:5px;font-size:11px}
+.dpe-fiche{width:22px;height:22px;border-radius:5px;font-size:12px}
+.dpe-comp{width:24px;height:24px;border-radius:6px;font-size:13px}
+.dpe-a{background:#379A3C;color:#fff}
+.dpe-b{background:#4FB146;color:#fff}
+.dpe-c{background:#C9D200;color:#1a1d21}
+.dpe-d{background:#FFED00;color:#1a1d21}
+.dpe-e{background:#FBBA00;color:#1a1d21}
+.dpe-f{background:#EB6909;color:#fff}
+.dpe-g{background:#E2001A;color:#fff}
+.chip-dpe{display:inline-flex;align-items:center;gap:6px;padding-left:6px}
+.lib-dpe{display:inline-flex;align-items:center;gap:8px}
+
+/* Fiche : aide sous le drapeau, bandeau « Hors de nos critères », vigilance. */
+.fiche-aide-prix{font-size:12px;color:var(--gris);margin-top:-4px}
+.hors-criteres{background:var(--creux);border-radius:14px;padding:12px 14px}
+.hc-titre{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--vigilance)}
+.hc-liste{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+.hc-liste li{display:inline-flex;align-items:center;gap:6px;background:var(--surface);border-radius:var(--r-pilule);padding:5px 11px;font-size:13px;font-weight:600}
+.hc-liste li::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--vigilance);flex:none}
+.vigilance .vig-ecarts li{font-weight:700}
+.vigilance .vig-autres{margin-top:10px;padding-top:10px;border-top:1px solid var(--ligne)}
+
+/* Onglet Autres : en-tête et état vide. */
+.tete-autres{padding:18px var(--gouttiere) 2px}
+.tete-autres h2{font-size:17px;font-weight:800;letter-spacing:-.01em}
+.tete-autres p{font-size:13px;color:var(--gris);margin-top:4px}
+.vide-autres{margin:14px var(--gouttiere);padding:22px 20px;background:var(--surface);border-radius:var(--r-carte);box-shadow:var(--ombre-1);display:flex;flex-direction:column;align-items:flex-start;gap:16px}
+.vide-autres p{font-size:15px;line-height:1.5}
+.vide-autres .ico{width:18px;height:18px}
+
+/* Accueil : Autres en ligne fine pleine largeur sous la grille 2 × 2. */
+.cellule-autres{grid-column:1 / -1;flex-direction:row;align-items:center;gap:12px;min-height:56px;padding:10px 14px}
+.cellule-autres b{margin:0;font-size:20px}
+.cellule-autres .cp-txt{margin-left:auto;text-align:right}
+
+@media (min-width:1024px){
+  .eb-filet{width:1px;align-self:center;height:24px;background:var(--ligne-forte);margin:0 4px}
+  .eb-autres{font-weight:600;color:var(--gris-clair)}
+  .eb-autres.actif{color:var(--encre)}
+  .tete-autres{padding:18px 28px 2px}
+  .vide-autres{margin:14px 28px;max-width:560px}
+  .grille-prios{grid-template-columns:repeat(4, minmax(0,1fr)) minmax(0,.72fr)}
+  .cellule-autres{grid-column:auto;display:grid;min-height:0;padding:18px 20px}
+  .cellule-autres b{font-size:32px}
+  .cellule-autres .cp-txt{margin-left:0;text-align:left}
 }
