@@ -1,5 +1,9 @@
 # Changelog
 
+## V3.7.2
+- Fiche : le bouton « Contact » devient « Suivi » (« En suivi » une fois actif), avec une icône de courbe d'activité à la place du téléphone. Même action qu'avant (colonne et API inchangées). Message de l'onglet Suivi vide aligné.
+- Service worker : cache `onh-v3-7-2`.
+
 ## V3.7.1
 - Ajouter : un doublon ou une annonce en corbeille a un lien « Voir l'annonce n°X » qui ouvre sa fiche ; fermer la fiche ramène sur Ajouter, résultats et saisie intacts. Pas de lien pour une annonce masquée.
 

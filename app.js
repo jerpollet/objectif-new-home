@@ -50,6 +50,7 @@
     x:'<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
     maison:'<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
     check:'<path d="M20 6 9 17l-5-5"/>',
+    suivi:'<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
     alerte:'<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
     cible:'<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
     tri:'<path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/>',
@@ -1202,7 +1203,7 @@
     else if (!liste.length){
       var filtre = UI.favoris || (type === "prio" && UI.nouveau);
       col.appendChild(el("p", {classe:"vide", texte:filtre ? "Aucune annonce ne correspond aux filtres." :
-        type === "suivi" ? "Aucune annonce en contact. Utilisez « Contact » dans une fiche pour la suivre ici." : "Aucune annonce en " + nomPrio(n) + " pour l'instant."}));
+        type === "suivi" ? "Aucune annonce en contact. Utilisez « Suivi » dans une fiche pour la suivre ici." : "Aucune annonce en " + nomPrio(n) + " pour l'instant."}));
     }
     else if (UI.viewMode === "list") col.appendChild(S.bureau ? tableauBureau(liste) : el("div", {classe:"lignes"}, liste.map(ligneMobile)));
     else col.appendChild(el("div", {classe:"cartes" + (type === "suivi" ? " cartes-suivi" : "")}, liste.map(function(a){ return carte(a, type === "suivi"); })));
@@ -1337,7 +1338,7 @@
     return el("div", {classe:"fiche-actions"}, [
       el("button", {type:"button", classe:"act act-favori" + (estFavori(a) ? " favori-actif" : ""), "aria-haspopup":"dialog", "aria-label":"Qui l'aime ?" + (estFavori(a) ? " " + aimeePar(a) : ""),
         onclick:function(){ ouvrirQuiAime(a, this); }}, [el("span", {classe:"act-coeur"}, [ico("heart", estFavori(a)), initiales(a)]), el("span", {texte:"Favori"})]),
-      el("button", {type:"button", classe:"act" + (a.enContact ? " actif" : ""), "aria-pressed":a.enContact ? "true" : "false", onclick:function(){ basculerContact(a); }}, [ico(a.enContact ? "check" : "phone"), el("span", {texte:a.enContact ? "En contact" : "Contact"})]),
+      el("button", {type:"button", classe:"act" + (a.enContact ? " actif" : ""), "aria-pressed":a.enContact ? "true" : "false", onclick:function(){ basculerContact(a); }}, [ico(a.enContact ? "check" : "suivi"), el("span", {texte:a.enContact ? "En suivi" : "Suivi"})]),
       el("button", {type:"button", classe:"act" + (dansComp ? " actif" : ""), "aria-pressed":dansComp ? "true" : "false", disabled:plein, title:plein ? "3 annonces au plus" : null, onclick:function(){ basculerComparer(a.num); }}, [ico("colonnes"), el("span", {texte:"Comparer"})]),
       boutonCorbeille(a, "act", [ico("trash"), el("span", {texte:"Corbeille"})]),
       lienAnnonce(a, "act-cta", [el("span", {texte:S.bureau ? "Voir l'annonce" : "Annonce"}), ico("externe")])
