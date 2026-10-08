@@ -50,6 +50,7 @@
     maison:'<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
     check:'<path d="M20 6 9 17l-5-5"/>',
     /* Suivre : coche dans un cercle pointillé ; suivie : cercle plein, coche de la couleur du texte sur accent. */
+    masquer:'<path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/>',
     suivre:'<circle cx="12" cy="12" r="10" stroke-dasharray="3.5 2.78"/><path d="m8.5 12 2.5 2.5 4.5-5"/>',
     suivie:'<circle cx="12" cy="12" r="10" fill="currentColor"/><path d="m8.5 12 2.5 2.5 4.5-5" style="stroke:var(--accent-texte)"/>',
     alerte:'<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
@@ -187,14 +188,14 @@
     ajout:{texte:"", resultats:null, coches:{}, verif:false, envoi:false, fait:null}
   };
   var D = null;
-  var UI = {viewMode:"cards", sort:"pertinence", favoris:false, nouveau:false, compareIds:[], prio:1, favFiltre:"tous", resumeOuvert:false};
+  var UI = {viewMode:"cards", sort:"pertinence", favoris:false, nouveau:false, sansSuivis:false, compareIds:[], prio:1, favFiltre:"tous", resumeOuvert:false};
   var FILTRES_FAV = ["tous", "cdc", "p1", "p2"];
   (function(){
     try {
       var u = JSON.parse(lsGet(LS_UI) || "{}");
       if (u.viewMode === "list" || u.viewMode === "cards") UI.viewMode = u.viewMode;
       if (TRIS.some(function(t){ return t.id === u.sort; })) UI.sort = u.sort;
-      UI.favoris = u.favoris === true; UI.nouveau = u["new"] === true;
+      UI.favoris = u.favoris === true; UI.nouveau = u["new"] === true; UI.sansSuivis = u.sansSuivis === true;
       if (Array.isArray(u.compareIds)) UI.compareIds = u.compareIds.filter(estNb).slice(0, MAX_COMPARER);
       if (NUMS_PRIO.indexOf(u.prio) >= 0) UI.prio = u.prio;
       if (FILTRES_FAV.indexOf(u.favFiltre) >= 0) UI.favFiltre = u.favFiltre;
@@ -202,7 +203,7 @@
     } catch(e){}
   })();
   function sauverUI(){
-    lsSet(LS_UI, JSON.stringify({viewMode:UI.viewMode, sort:UI.sort, favoris:UI.favoris, "new":UI.nouveau, compareIds:UI.compareIds, prio:UI.prio,
+    lsSet(LS_UI, JSON.stringify({viewMode:UI.viewMode, sort:UI.sort, favoris:UI.favoris, "new":UI.nouveau, sansSuivis:UI.sansSuivis, compareIds:UI.compareIds, prio:UI.prio,
       favFiltre:UI.favFiltre, resumeOuvert:UI.resumeOuvert}));
   }
 
@@ -242,6 +243,7 @@
   function filtrer(l, avecNew){
     if (UI.favoris) l = l.filter(estFavori);
     if (avecNew && UI.nouveau) l = l.filter(estNew);
+    if (avecNew && UI.sansSuivis) l = l.filter(function(a){ return !a.enContact; });
     return l;
   }
   function comparerNb(x, y, desc){
@@ -911,14 +913,17 @@
   }
 
   /* ---------- Briques d'affichage ---------- */
-  function tags(a){
+  /* avecSuivi : vue liste et tableau seulement (indicatif, pas cliquable). */
+  function tags(a, avecSuivi){
     var t = [];
     /* Ordre fixe : New › Coup de cœur › Pépite (jamais de Pépite en Autres). */
     if (estNew(a)) t.push(el("span", {classe:"tag tag-new", texte:"New"}));
     if (estCoupDeCoeur(a)) t.push(tagCoupDeCoeur());
     if (a.pepite && a.prio !== AUTRES) t.push(el("span", {classe:"tag tag-pepite", texte:"Pépite"}));
+    if (avecSuivi && a.enContact) t.push(tagSuivi());
     return t.length ? el("div", {classe:"tags"}, t) : null;
   }
+  function tagSuivi(){ return el("span", {classe:"tag tag-contact"}, [ico("suivie"), "Suivi"]); }
   function tagCoupDeCoeur(){ return el("span", {classe:"tag tag-cdc", texte:"Coup de cœur"}); }
   /* Initiales sous le cœur (1re personne fond encre, 2e fond accent). */
   function initiales(a){
@@ -1016,10 +1021,10 @@
     var d = drapeauPrix(a);
     return d ? el("span", {classe:"drapeau dr-" + d.niveau, texte:court ? d.court : d.texte}) : null;
   }
-  /* Bouton Suivre / Suivie des cartes (même action que dans la fiche). */
+  /* Bouton Suivre / Suivi des cartes (même action que dans la fiche). */
   function boutonSuivre(a){
     return el("button", {type:"button", classe:"carte-suivre" + (a.enContact ? " actif" : ""), "aria-pressed":a.enContact ? "true" : "false",
-      onclick:function(e){ e.stopPropagation(); basculerContact(a); }}, [ico(a.enContact ? "suivie" : "suivre"), el("span", {texte:a.enContact ? "Suivie" : "Suivre"})]);
+      onclick:function(e){ e.stopPropagation(); basculerContact(a); }}, [ico(a.enContact ? "suivie" : "suivre"), el("span", {texte:a.enContact ? "Suivi" : "Suivre"})]);
   }
   /* Ligne « ≈ X k€ frais compris » + drapeau, sous le prix. */
   function ligneFraisCompris(a){
@@ -1030,11 +1035,11 @@
   function ligneCriteres(a, court){
     return el("div", {classe:"carte-crit"}, [el("span", {texte:criteres(a, court)}), pastilleDpe(a, "carte")]);
   }
-  /* 1re ligne du corps : Prio › Suivie (pas de source sur les cartes, elle est dans la fiche). */
+  /* 1re ligne du corps : Prio › Suivi (pas de source sur les cartes, elle est dans la fiche). */
   function ligneMeta(a, sansSuivi){
     return el("div", {classe:"carte-meta"}, [
       badgePrio(a),
-      a.enContact && !sansSuivi ? el("span", {classe:"tag tag-contact"}, [ico("suivie"), "Suivie"]) : null
+      a.enContact && !sansSuivi ? tagSuivi() : null
     ]);
   }
 
@@ -1049,7 +1054,7 @@
       el("div", {classe:"carte-lieu"}, [el("b", {texte:lieuComplet(a)})]),
       ligneCriteres(a),
       suivi
-        ? el("div", {classe:"carte-contact"}, [ico("suivie"), el("span", {texte:"Suivie depuis le " + (dateCourte(a.enContactDepuis) || "?")})])
+        ? el("div", {classe:"carte-contact"}, [ico("suivie"), el("span", {texte:"Suivi depuis le " + (dateCourte(a.enContactDepuis) || "?")})])
         : el("div", {classe:"carte-bas"}, [caseComparer(a), boutonSuivre(a)]),
       suivi ? derniereActivite(a) : null
     ]);
@@ -1100,7 +1105,7 @@
     var m2 = estNb(a.surface) ? " · " + nb(a.surface) + " m²" : "";
     return cliquable(el("div", {classe:"ligne-annonce"}, [
       el("div", {classe:"la-txt"}, [
-        el("div", {classe:"la-haut"}, [el("span", {classe:"la-prix", texte:estNb(a.prix) ? euros(a.prix) : "Prix ?"}), tags(a)]),
+        el("div", {classe:"la-haut"}, [el("span", {classe:"la-prix", texte:estNb(a.prix) ? euros(a.prix) : "Prix ?"}), tags(a, true)]),
         el("div", {classe:"la-lieu"}, [el("b", {texte:lieu(a)}), m2])
       ]),
       coeur(a)
@@ -1116,7 +1121,7 @@
         el("td", {classe:"t-lieu", texte:lieu(a)}),
         el("td", {texte:estNb(a.surface) ? nb(a.surface) + " m²" : "—"}),
         el("td", {texte:estNb(a.chambres) ? String(a.chambres) : "—"}),
-        el("td", null, [tags(a)]),
+        el("td", null, [tags(a, true)]),
         el("td", {classe:"t-gris", texte:courtPrio(a.prio) + " · " + (sourceAffichee(a) || "—")}),
         el("td", {classe:"t-coeur"}, [coeur(a)])
       ]), a.num));
@@ -1145,10 +1150,12 @@
       S.bureau ? [ico("tri"), el("span", {texte:"Tri : " + t.nom}), el("span", {classe:"caret", "aria-hidden":"true", texte:S.tri ? "▴" : "▾"})] : [ico("tri"), el("span", {texte:t.court})]);
     var zoneTri = el("div", {classe:"zone-tri"}, [boutonTri, S.tri === "menu" ? menuTri() : null]);
     var outils = el("div", {classe:"outils"}, [
-      S.bureau ? el("span", {classe:"outils-nb", texte:D ? (type === "suivi" ? pluriel(n, "suivie") : pluriel(n, "annonce")) : "Chargement…"}) : null,
+      S.bureau ? el("span", {classe:"outils-nb", texte:D ? pluriel(n, "annonce") : "Chargement…"}) : null,
       zoneTri,
-      el("button", {type:"button", classe:"puce", "aria-pressed":UI.favoris ? "true" : "false", onclick:function(){ UI.favoris = !UI.favoris; sauverUI(); rendre(); }}, [ico("heart", true), el("span", {texte:"Favoris"})]),
+      /* Mobile : cœur seul pour gagner de la place. */
+      el("button", {type:"button", classe:"puce" + (S.bureau ? "" : " puce-ico"), "aria-pressed":UI.favoris ? "true" : "false", "aria-label":"Favoris", title:"Favoris", onclick:function(){ UI.favoris = !UI.favoris; sauverUI(); rendre(); }}, [ico("heart", true), S.bureau ? el("span", {texte:"Favoris"}) : null]),
       type === "prio" ? el("button", {type:"button", classe:"puce", "aria-pressed":UI.nouveau ? "true" : "false", onclick:function(){ UI.nouveau = !UI.nouveau; sauverUI(); rendre(); }}, ["New"]) : null,
+      type === "prio" ? el("button", {type:"button", classe:"puce" + (S.bureau ? "" : " puce-ico"), "aria-pressed":UI.sansSuivis ? "true" : "false", "aria-label":"Masquer les annonces suivies", title:"Masquer les annonces suivies", onclick:function(){ UI.sansSuivis = !UI.sansSuivis; sauverUI(); rendre(); }}, [ico("masquer"), S.bureau ? el("span", {texte:"Masquer les suivis"}) : null]) : null,
       el("span", {classe:"espace"}),
       el("div", {classe:"segmente", role:"group", "aria-label":"Affichage"}, [["cards","Cartes","lignes"],["list","Liste","menu"]].map(function(m){
         return el("button", {type:"button", "aria-pressed":UI.viewMode === m[0] ? "true" : "false", "aria-label":m[1],
@@ -1202,7 +1209,7 @@
       ]));
     }
     else if (!liste.length){
-      var filtre = UI.favoris || (type === "prio" && UI.nouveau);
+      var filtre = UI.favoris || (type === "prio" && (UI.nouveau || UI.sansSuivis));
       col.appendChild(el("p", {classe:"vide", texte:filtre ? "Aucune annonce ne correspond aux filtres." :
         type === "suivi" ? "Aucune annonce suivie. Utilisez « Suivre » sur une carte ou dans une fiche pour la retrouver ici." : "Aucune annonce en " + nomPrio(n) + " pour l'instant."}));
     }
@@ -1300,7 +1307,7 @@
       el("div", {classe:"fiche-in"}, [
         el("div", {classe:"fiche-meta"}, [badgePrio(a), el("span", {texte:meta}), lienNonVerifie(a) ? el("span", {classe:"tag tag-nonverif", texte:"Lien non vérifié"}) : null]),
         a.corbeille ? el("p", {classe:"fiche-etat-suivi", texte:"Dans la corbeille depuis le " + (dateCourte(a.corbeilleLe || a.statutLe) || "?") + (txt(a.raisonCorbeille) ? " : " + txt(a.raisonCorbeille) : "")}) : null,
-        a.enContact ? el("p", {classe:"fiche-etat-suivi"}, [ico("suivie"), " Suivie depuis le " + (dateCourte(a.enContactDepuis) || "?")]) : null,
+        a.enContact ? el("p", {classe:"fiche-etat-suivi"}, [ico("suivie"), " Suivi depuis le " + (dateCourte(a.enContactDepuis) || "?")]) : null,
         el("div", {classe:"fiche-prix"}, [el("span", {classe:"prix", texte:estNb(a.prix) ? euros(a.prix) : "Prix non précisé"}), m2 ? el("span", {classe:"m2", texte:nb(m2) + " €/m²"}) : null]),
         fc ? el("div", {classe:"fiche-fc"}, [el("b", {texte:"≈ " + kEuros(fc) + " frais compris"}), pastilleDrapeau(a)]) : null,
         fc && aidePrix(a) ? el("p", {classe:"fiche-aide-prix", texte:aidePrix(a)}) : null,
@@ -1339,7 +1346,7 @@
     return el("div", {classe:"fiche-actions"}, [
       el("button", {type:"button", classe:"act act-favori" + (estFavori(a) ? " favori-actif" : ""), "aria-haspopup":"dialog", "aria-label":"Qui l'aime ?" + (estFavori(a) ? " " + aimeePar(a) : ""),
         onclick:function(){ ouvrirQuiAime(a, this); }}, [el("span", {classe:"act-coeur"}, [ico("heart", estFavori(a)), initiales(a)]), el("span", {texte:"Favori"})]),
-      el("button", {type:"button", classe:"act" + (a.enContact ? " actif" : ""), "aria-pressed":a.enContact ? "true" : "false", onclick:function(){ basculerContact(a); }}, [ico(a.enContact ? "suivie" : "suivre"), el("span", {texte:a.enContact ? "Suivie" : "Suivre"})]),
+      el("button", {type:"button", classe:"act" + (a.enContact ? " actif" : ""), "aria-pressed":a.enContact ? "true" : "false", onclick:function(){ basculerContact(a); }}, [ico(a.enContact ? "suivie" : "suivre"), el("span", {texte:a.enContact ? "Suivi" : "Suivre"})]),
       el("button", {type:"button", classe:"act" + (dansComp ? " actif" : ""), "aria-pressed":dansComp ? "true" : "false", disabled:plein, title:plein ? "3 annonces au plus" : null, onclick:function(){ basculerComparer(a.num); }}, [ico("colonnes"), el("span", {texte:"Comparer"})]),
       boutonCorbeille(a, "act", [ico("trash"), el("span", {texte:"Corbeille"})]),
       lienAnnonce(a, "act-cta", [el("span", {texte:S.bureau ? "Voir l'annonce" : "Annonce"}), ico("externe")])
@@ -1903,7 +1910,7 @@
     if (!D && !S.echec) return "Chargement…";
     var r = S.route.nom === "fiche" ? S.fond : S.route;
     if (r.nom === "prio") return nomPrio(r.n) + " · " + pluriel(trier(filtrer(parPrio(r.n), true)).length, "annonce");
-    if (r.nom === "suivi") return "Suivi · " + pluriel(suivis().length, "suivie");
+    if (r.nom === "suivi") return "Suivi · " + pluriel(suivis().length, "annonce");
     if (r.nom === "favoris") return "Favoris · " + pluriel(favoris().length, "annonce");
     if (r.nom === "comparer") return "Comparer · " + UI.compareIds.length + " / " + MAX_COMPARER;
     if (r.nom === "corbeille") return "Corbeille · " + dansCorbeille().length;

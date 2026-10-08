@@ -112,6 +112,15 @@ a{color:inherit}
 .puce{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:0 11px;flex:none;border:1px solid var(--ligne-forte);background:var(--surface);border-radius:var(--r-pilule);font-size:13px;font-weight:600;white-space:nowrap;position:relative}
 .puce::after{content:"";position:absolute;inset:-3px 0}
 .puce .ico{width:15px;height:15px}
+.puce-ico{width:40px;padding:0;justify-content:center}
+/* Petits écrans : la barre (tri, ♥, New, masquer les suivis, affichage) tient sans défiler dès 360 px. */
+@media (max-width:429px){
+  .outils{gap:4px}
+  .outils .puce{padding:0 9px}
+  .outils .puce-ico{width:36px;padding:0}
+  .outils .espace{min-width:0}
+  .segmente button{padding:0 6px}
+}
 .puce[aria-pressed="true"],.puce-tri.ouverte{background:var(--encre);border-color:var(--encre);color:#fff}
 .espace{flex:1;min-width:4px}
 .segmente{display:flex;background:var(--creux);border-radius:var(--r-pilule);padding:3px;flex:none}
