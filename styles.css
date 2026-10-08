@@ -382,7 +382,9 @@ a{color:inherit}
 .resultats{list-style:none;margin:18px 0 0;padding:4px 0;background:var(--surface);border-radius:var(--r-carte);box-shadow:var(--ombre-1)}
 .resultat{display:flex;align-items:center;gap:10px;padding:12px 14px 12px 8px;border-bottom:1px solid var(--ligne)}
 .resultat:last-child{border-bottom:0}
-.resultat.estompe .res-txt{opacity:.6}
+.resultat.estompe .res-txt > b,.resultat.estompe .res-txt > .res-detail{opacity:.6}
+.res-voir{align-self:flex-start;display:inline-flex;align-items:center;gap:4px;margin-top:4px;padding:4px 0;font-size:13px;font-weight:700;color:var(--accent-600);text-decoration:underline;text-underline-offset:3px}
+.res-voir .ico{width:14px;height:14px}
 .res-case{position:relative;cursor:pointer;flex:none;width:44px;height:44px;display:grid;place-items:center}
 .res-case .case{width:24px;height:24px;border-radius:7px}
 .res-case .case .ico{width:16px;height:16px;opacity:0;color:#fff}

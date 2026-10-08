@@ -1815,7 +1815,8 @@
           el("span", {classe:"case", "aria-hidden":"true"}, [ico("check")])
         ]),
         el("div", {classe:"res-txt", title:detailVerif(r, true) !== detailVerif(r) ? detailVerif(r, true) : null,
-          onclick:function(e){ var sp = e.currentTarget.lastChild; sp.textContent = sp.textContent === detailVerif(r) ? detailVerif(r, true) : detailVerif(r); }}, [el("b", {texte:titreVerif(r)}), el("span", {texte:detailVerif(r)})]),
+          onclick:function(e){ var sp = e.currentTarget.querySelector(".res-detail"); sp.textContent = sp.textContent === detailVerif(r) ? detailVerif(r, true) : detailVerif(r); }},
+          [el("b", {texte:titreVerif(r)}), el("span", {classe:"res-detail", texte:detailVerif(r)}), lienVersAnnonce(r)]),
         el("span", {classe:"badge-etat e-" + r.etat.toLowerCase(), texte:ETATS[r.etat] ? ETATS[r.etat].badge : r.etat})
       ]);
     })));
@@ -1825,6 +1826,13 @@
       el("span", {texte:A.envoi ? "Envoi…" : n ? "Envoyer " + pluriel(n, "annonce") + " à la veille" : "Aucune annonce à envoyer"}), ico("fleche")
     ])]));
     return box;
+  }
+  /* Doublon ou annonce en corbeille : lien vers sa fiche. Fermer la fiche ramène sur Ajouter, résultats intacts.
+     Rien pour une annonce masquée (elle n'a pas de fiche) ni tant que les annonces ne sont pas chargées. */
+  function lienVersAnnonce(r){
+    if ((r.etat !== "DOUBLON" && r.etat !== "IGNOREE") || r.masquee || !estNb(r.num) || !trouver(r.num)) return null;
+    return el("button", {type:"button", classe:"res-voir", "aria-label":"Voir l'annonce n°" + r.num,
+      onclick:function(e){ e.stopPropagation(); ouvrirFiche(r.num); }}, ["Voir l'annonce n°" + r.num, ico("fleche")]);
   }
   function rendreVerification(){
     var v = $("verification");

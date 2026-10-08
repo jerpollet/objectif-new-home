@@ -1,5 +1,8 @@
 # Changelog
 
+## V3.7.1
+- Ajouter : un doublon ou une annonce en corbeille a un lien « Voir l'annonce n°X » qui ouvre sa fiche ; fermer la fiche ramène sur Ajouter, résultats et saisie intacts. Pas de lien pour une annonce masquée.
+
 ## V3.7 (onglet Autres, DPE en couleur, plafonds, écarts aux critères)
 - Onglet « Autres » (Prio 5, nom lu dans « Prio 5 zone ») : vos ajouts hors de nos secteurs. Barre du bas en 4 colonnes égales + 60 px derrière un filet, nom + nombre seulement (plus de compteur « new » sur aucun onglet), libellé seul à 60 % quand il est vide ; en-tête desktop après un filet. En-tête d'onglet, état vide avec « Ajouter des annonces », chip « 📌 Autres » grise, jamais de Pépite (forcée à faux à l'affichage).
 - Badges : statuts sur la photo New › Coup de cœur › Pépite (place réservée au Partager et au cœur) ; 1re ligne Prio › En contact › source (seule la source se tronque) ; ligne « ≈ … frais compris » + drapeau ; pastille DPE en bout de critères. Pas de badge « Ajoutée par ».
