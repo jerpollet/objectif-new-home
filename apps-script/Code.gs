@@ -412,7 +412,7 @@ function changerStatut_(action, corps) {
   if (action === 'favori' && !!corps.valeur !== (avant.aimeePar || []).indexOf(personne.id) >= 0) {
     texte = (corps.valeur ? 'Ajoutée aux favoris de ' : 'Retirée des favoris de ') + personne.nom;
   }
-  else if (action === 'contact' && !!corps.valeur !== !!avant.enContact) texte = corps.valeur ? 'Passée en contact' : 'Retirée du suivi';
+  else if (action === 'contact' && !!corps.valeur !== !!avant.enContact) texte = corps.valeur ? 'Ajoutée au suivi' : 'Retirée du suivi';
   else if (action === 'corbeille' && !avant.corbeille) texte = 'Mise à la corbeille' + (maj.raisonCorbeille ? ' : ' + String(corps.raison).trim().slice(0, MAX_RAISON) : '');
   else if (action === 'restaurer' && avant.corbeille) texte = 'Restaurée';
   const types = { favori: 'Favori', contact: 'Contact', corbeille: 'Corbeille', restaurer: 'Restauration' };

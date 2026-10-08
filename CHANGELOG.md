@@ -1,7 +1,9 @@
 # Changelog
 
-## V3.7.2
-- Fiche : le bouton « Contact » devient « Suivi » (« En suivi » une fois actif), avec une icône de courbe d'activité à la place du téléphone. Même action qu'avant (colonne et API inchangées). Message de l'onglet Suivi vide aligné.
+## V3.7.2 (Suivre)
+- Vocabulaire : « Contact » devient « Suivre » / « Suivie » partout à l'écran (fiche, cartes, badge, onglet Suivi, menu, comparateur, journal). Icône : coche dans un cercle pointillé quand l'annonce n'est pas suivie, cercle plein quand elle l'est ; l'icône téléphone disparaît. Colonnes du tableau (« En contact », « En contact depuis »), clés et action API (`contact`) inchangées.
+- Cartes des Prio : « Comparer » passe à gauche, un bouton « Suivre » à droite (même action que dans la fiche) ; l'adéquation et la source ne sont plus affichées sur les cartes (toujours dans la fiche et le tri Pertinence).
+- Journal : la ligne automatique dit « Ajoutée au suivi » (au lieu de « Passée en contact ») ; à recopier dans Apps Script pour les écritures réelles, les anciennes lignes restent telles quelles.
 - Service worker : cache `onh-v3-7-2`.
 
 ## V3.7.1

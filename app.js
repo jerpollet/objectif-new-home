@@ -41,7 +41,6 @@
   /* Icônes Lucide (trait de 2 px), en SVG inline. Chaînes constantes : aucune donnée du tableau. */
   var ICONES = {
     heart:'<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>',
-    phone:'<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>',
     trash:'<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/>',
     externe:'<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
     colonnes:'<rect width="18" height="18" x="3" y="3"/><path d="M12 3v18"/>',
@@ -50,7 +49,9 @@
     x:'<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
     maison:'<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
     check:'<path d="M20 6 9 17l-5-5"/>',
-    suivi:'<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+    /* Suivre : coche dans un cercle pointillé ; suivie : cercle plein, coche de la couleur du texte sur accent. */
+    suivre:'<circle cx="12" cy="12" r="10" stroke-dasharray="3.5 2.78"/><path d="m8.5 12 2.5 2.5 4.5-5"/>',
+    suivie:'<circle cx="12" cy="12" r="10" fill="currentColor"/><path d="m8.5 12 2.5 2.5 4.5-5" style="stroke:var(--accent-texte)"/>',
     alerte:'<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
     cible:'<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
     tri:'<path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/>',
@@ -434,7 +435,7 @@
         var pf = PERSONNES.filter(function(x){ return x.id === c.qui; })[0];
         if (c.action === "favori" && !pf) return test.attendre().then(function(){ throw erreur("Paramètre « qui » manquant ou inconnu."); });
         if (c.action === "favori" && !!c.valeur !== aime(a, pf)) t = ["Favori", (c.valeur ? "Ajoutée aux favoris de " : "Retirée des favoris de ") + pf.nom];
-        else if (c.action === "contact" && !!c.valeur !== !!a.enContact) t = ["Contact", c.valeur ? "Passée en contact" : "Retirée du suivi"];
+        else if (c.action === "contact" && !!c.valeur !== !!a.enContact) t = ["Contact", c.valeur ? "Ajoutée au suivi" : "Retirée du suivi"];
         else if (c.action === "corbeille" && !a.corbeille) t = ["Corbeille", "Mise à la corbeille" + (txt(c.raison) ? " : " + txt(c.raison) : "")];
         else if (c.action === "restaurer" && a.corbeille) t = ["Restauration", "Restaurée"];
         appliquerStatut(a, c.action, c.valeur, new Date().toISOString(), c.qui);
@@ -829,7 +830,7 @@
     var j = jour(d) === jour(auj) ? "aujourd'hui" : jour(d) === jour(hier) ? "hier" : jourCourt(iso);
     return j + " · " + heure(iso);
   }
-  var ICONES_JOURNAL = {Favori:"heart", Contact:"phone", Corbeille:"trash", Restauration:"retour", Commentaire:"message"};
+  var ICONES_JOURNAL = {Favori:"heart", Contact:"suivie", Corbeille:"trash", Restauration:"retour", Commentaire:"message"};
   function icoEntree(e){ return ico(ICONES_JOURNAL[e.type] || "historique"); }
   function envoyerCommentaire(a, zone){
     var k = "journal-" + a.num, texte = txt(zone ? zone.value : S.brouillons[k]).slice(0, MAX_NOTE);
@@ -1015,9 +1016,10 @@
     var d = drapeauPrix(a);
     return d ? el("span", {classe:"drapeau dr-" + d.niveau, texte:court ? d.court : d.texte}) : null;
   }
-  function evaluation(a){
-    var s = adequation(a);
-    return el("div", {classe:"carte-eval"}, [s !== null ? el("span", {classe:"score", texte:"Adéquation " + s}) : null]);
+  /* Bouton Suivre / Suivie des cartes (même action que dans la fiche). */
+  function boutonSuivre(a){
+    return el("button", {type:"button", classe:"carte-suivre" + (a.enContact ? " actif" : ""), "aria-pressed":a.enContact ? "true" : "false",
+      onclick:function(e){ e.stopPropagation(); basculerContact(a); }}, [ico(a.enContact ? "suivie" : "suivre"), el("span", {texte:a.enContact ? "Suivie" : "Suivre"})]);
   }
   /* Ligne « ≈ X k€ frais compris » + drapeau, sous le prix. */
   function ligneFraisCompris(a){
@@ -1028,12 +1030,11 @@
   function ligneCriteres(a, court){
     return el("div", {classe:"carte-crit"}, [el("span", {texte:criteres(a, court)}), pastilleDpe(a, "carte")]);
   }
-  /* 1re ligne du corps : Prio › En contact › source (seule la source se tronque). */
-  function ligneMeta(a, sansContact){
+  /* 1re ligne du corps : Prio › Suivie (pas de source sur les cartes, elle est dans la fiche). */
+  function ligneMeta(a, sansSuivi){
     return el("div", {classe:"carte-meta"}, [
       badgePrio(a),
-      a.enContact && !sansContact ? el("span", {classe:"tag tag-contact"}, [ico("phone"), "En contact"]) : null,
-      el("span", {classe:"source", texte:sourceAffichee(a) || "Source inconnue"})
+      a.enContact && !sansSuivi ? el("span", {classe:"tag tag-contact"}, [ico("suivie"), "Suivie"]) : null
     ]);
   }
 
@@ -1042,14 +1043,14 @@
     var choisie = S.route.nom === "fiche" && S.route.num === a.num && S.bureau;
     var m2 = prixM2(a);
     var corps = el("div", {classe:"carte-corps"}, [
-      ligneMeta(a, suivi),
+      ligneMeta(a, true),
       el("div", {classe:"carte-prix"}, [el("span", {texte:estNb(a.prix) ? euros(a.prix) : "Prix non précisé"}), m2 ? el("span", {classe:"m2", texte:nb(m2) + " €/m²"}) : null]),
       ligneFraisCompris(a),
       el("div", {classe:"carte-lieu"}, [el("b", {texte:lieuComplet(a)})]),
       ligneCriteres(a),
       suivi
-        ? el("div", {classe:"carte-contact"}, [ico("phone"), el("span", {texte:"En contact depuis le " + (dateCourte(a.enContactDepuis) || "?")})])
-        : el("div", {classe:"carte-bas"}, [evaluation(a), caseComparer(a)]),
+        ? el("div", {classe:"carte-contact"}, [ico("suivie"), el("span", {texte:"Suivie depuis le " + (dateCourte(a.enContactDepuis) || "?")})])
+        : el("div", {classe:"carte-bas"}, [caseComparer(a), boutonSuivre(a)]),
       suivi ? derniereActivite(a) : null
     ]);
     var art = el("article", {classe:"carte" + (choisie ? " choisie" : "") + (suivi ? " carte-suivi" : ""), "aria-label":lieu(a) + ", " + (estNb(a.prix) ? euros(a.prix) : "prix non précisé")}, [
@@ -1144,7 +1145,7 @@
       S.bureau ? [ico("tri"), el("span", {texte:"Tri : " + t.nom}), el("span", {classe:"caret", "aria-hidden":"true", texte:S.tri ? "▴" : "▾"})] : [ico("tri"), el("span", {texte:t.court})]);
     var zoneTri = el("div", {classe:"zone-tri"}, [boutonTri, S.tri === "menu" ? menuTri() : null]);
     var outils = el("div", {classe:"outils"}, [
-      S.bureau ? el("span", {classe:"outils-nb", texte:D ? (type === "suivi" ? n + " en contact" : pluriel(n, "annonce")) : "Chargement…"}) : null,
+      S.bureau ? el("span", {classe:"outils-nb", texte:D ? (type === "suivi" ? pluriel(n, "suivie") : pluriel(n, "annonce")) : "Chargement…"}) : null,
       zoneTri,
       el("button", {type:"button", classe:"puce", "aria-pressed":UI.favoris ? "true" : "false", onclick:function(){ UI.favoris = !UI.favoris; sauverUI(); rendre(); }}, [ico("heart", true), el("span", {texte:"Favoris"})]),
       type === "prio" ? el("button", {type:"button", classe:"puce", "aria-pressed":UI.nouveau ? "true" : "false", onclick:function(){ UI.nouveau = !UI.nouveau; sauverUI(); rendre(); }}, ["New"]) : null,
@@ -1203,7 +1204,7 @@
     else if (!liste.length){
       var filtre = UI.favoris || (type === "prio" && UI.nouveau);
       col.appendChild(el("p", {classe:"vide", texte:filtre ? "Aucune annonce ne correspond aux filtres." :
-        type === "suivi" ? "Aucune annonce en contact. Utilisez « Suivi » dans une fiche pour la suivre ici." : "Aucune annonce en " + nomPrio(n) + " pour l'instant."}));
+        type === "suivi" ? "Aucune annonce suivie. Utilisez « Suivre » sur une carte ou dans une fiche pour la retrouver ici." : "Aucune annonce en " + nomPrio(n) + " pour l'instant."}));
     }
     else if (UI.viewMode === "list") col.appendChild(S.bureau ? tableauBureau(liste) : el("div", {classe:"lignes"}, liste.map(ligneMobile)));
     else col.appendChild(el("div", {classe:"cartes" + (type === "suivi" ? " cartes-suivi" : "")}, liste.map(function(a){ return carte(a, type === "suivi"); })));
@@ -1299,7 +1300,7 @@
       el("div", {classe:"fiche-in"}, [
         el("div", {classe:"fiche-meta"}, [badgePrio(a), el("span", {texte:meta}), lienNonVerifie(a) ? el("span", {classe:"tag tag-nonverif", texte:"Lien non vérifié"}) : null]),
         a.corbeille ? el("p", {classe:"fiche-etat-suivi", texte:"Dans la corbeille depuis le " + (dateCourte(a.corbeilleLe || a.statutLe) || "?") + (txt(a.raisonCorbeille) ? " : " + txt(a.raisonCorbeille) : "")}) : null,
-        a.enContact ? el("p", {classe:"fiche-etat-suivi"}, [ico("phone"), " En contact depuis le " + (dateCourte(a.enContactDepuis) || "?")]) : null,
+        a.enContact ? el("p", {classe:"fiche-etat-suivi"}, [ico("suivie"), " Suivie depuis le " + (dateCourte(a.enContactDepuis) || "?")]) : null,
         el("div", {classe:"fiche-prix"}, [el("span", {classe:"prix", texte:estNb(a.prix) ? euros(a.prix) : "Prix non précisé"}), m2 ? el("span", {classe:"m2", texte:nb(m2) + " €/m²"}) : null]),
         fc ? el("div", {classe:"fiche-fc"}, [el("b", {texte:"≈ " + kEuros(fc) + " frais compris"}), pastilleDrapeau(a)]) : null,
         fc && aidePrix(a) ? el("p", {classe:"fiche-aide-prix", texte:aidePrix(a)}) : null,
@@ -1338,7 +1339,7 @@
     return el("div", {classe:"fiche-actions"}, [
       el("button", {type:"button", classe:"act act-favori" + (estFavori(a) ? " favori-actif" : ""), "aria-haspopup":"dialog", "aria-label":"Qui l'aime ?" + (estFavori(a) ? " " + aimeePar(a) : ""),
         onclick:function(){ ouvrirQuiAime(a, this); }}, [el("span", {classe:"act-coeur"}, [ico("heart", estFavori(a)), initiales(a)]), el("span", {texte:"Favori"})]),
-      el("button", {type:"button", classe:"act" + (a.enContact ? " actif" : ""), "aria-pressed":a.enContact ? "true" : "false", onclick:function(){ basculerContact(a); }}, [ico(a.enContact ? "check" : "suivi"), el("span", {texte:a.enContact ? "En suivi" : "Suivi"})]),
+      el("button", {type:"button", classe:"act" + (a.enContact ? " actif" : ""), "aria-pressed":a.enContact ? "true" : "false", onclick:function(){ basculerContact(a); }}, [ico(a.enContact ? "suivie" : "suivre"), el("span", {texte:a.enContact ? "Suivie" : "Suivre"})]),
       el("button", {type:"button", classe:"act" + (dansComp ? " actif" : ""), "aria-pressed":dansComp ? "true" : "false", disabled:plein, title:plein ? "3 annonces au plus" : null, onclick:function(){ basculerComparer(a.num); }}, [ico("colonnes"), el("span", {texte:"Comparer"})]),
       boutonCorbeille(a, "act", [ico("trash"), el("span", {texte:"Corbeille"})]),
       lienAnnonce(a, "act-cta", [el("span", {texte:S.bureau ? "Voir l'annonce" : "Annonce"}), ico("externe")])
@@ -1586,7 +1587,7 @@
   }
   function listeCandidats(){
     var l = candidatsComparer();
-    if (!l.length) return [el("p", {classe:"inconnu", texte:"Aucun favori ni annonce en contact à proposer. Cochez « Comparer » sur une carte d'une Prio."})];
+    if (!l.length) return [el("p", {classe:"inconnu", texte:"Aucun favori ni annonce suivie à proposer. Cochez « Comparer » sur une carte d'une Prio."})];
     return l.map(function(a){
       return el("button", {type:"button", classe:"candidat", onclick:function(){ basculerComparer(a.num); S.choix = false; rendre(); }}, [
         el("span", {texte:(estNb(a.prix) ? euros(a.prix) : "Prix ?") + " · " + lieu(a)}), ico("plus")
@@ -1902,7 +1903,7 @@
     if (!D && !S.echec) return "Chargement…";
     var r = S.route.nom === "fiche" ? S.fond : S.route;
     if (r.nom === "prio") return nomPrio(r.n) + " · " + pluriel(trier(filtrer(parPrio(r.n), true)).length, "annonce");
-    if (r.nom === "suivi") return "Suivi · " + suivis().length + " en contact";
+    if (r.nom === "suivi") return "Suivi · " + pluriel(suivis().length, "suivie");
     if (r.nom === "favoris") return "Favoris · " + pluriel(favoris().length, "annonce");
     if (r.nom === "comparer") return "Comparer · " + UI.compareIds.length + " / " + MAX_COMPARER;
     if (r.nom === "corbeille") return "Corbeille · " + dansCorbeille().length;
@@ -1965,7 +1966,7 @@
         entree("accueil", "maison", "Accueil", null),
         entree("favoris", "heart", "Favoris", D ? String(favoris().length) : null, "menu-favoris",
           nCdc ? el("small", {classe:"pilule-cdc", "aria-label":nCdc + " coups de cœur"}, [String(nCdc) + " ", el("span", {classe:"deux-coeurs", "aria-hidden":"true"}, [ico("heart", true), ico("heart", true)])]) : null),
-        entree("suivi", "phone", "Suivi", D ? String(suivis().length) : null),
+        entree("suivi", "suivie", "Suivi", D ? String(suivis().length) : null),
         entree("comparer", "colonnes", "Comparer", UI.compareIds.length + " / " + MAX_COMPARER),
         entree("ajouter", "plus", "Ajouter des annonces", null),
         entree("corbeille", "trash", "Corbeille", D ? String(dansCorbeille().length) : null, "menu-corbeille")
