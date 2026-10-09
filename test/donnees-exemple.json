@@ -234,7 +234,7 @@
       "energieMin": 1800,
       "energieMax": 1800,
       "taxeFonciere": 2100,
-      "lienVerifieLe": "2026-10-05T08:40:00.000Z"
+      "lienVerifieLe": "2026-09-07T10:00:00.000Z"
     },
     {
       "num": 203,
@@ -329,7 +329,7 @@
       "corbeille": true,
       "corbeilleLe": "2026-10-02T08:00:00.000Z",
       "statutLe": "2026-10-02T08:00:00.000Z",
-      "raisonCorbeille": "DPE F (test)",
+      "raisonCorbeille": "Trop cher",
       "lienVerifieLe": "2026-10-05T08:40:00.000Z"
     },
     {
@@ -347,9 +347,33 @@
       "repereeLe": "2026-09-01T18:00:00.000Z",
       "score": 55,
       "corbeille": true,
-      "corbeilleLe": "2026-09-30T08:00:00.000Z",
-      "statutLe": "2026-09-30T08:00:00.000Z",
-      "lienVerifieLe": "2026-10-05T08:40:00.000Z"
+      "corbeilleLe": "2026-10-05T19:00:00.000Z",
+      "statutLe": "2026-10-05T19:00:00.000Z",
+      "lienVerifieLe": "2026-10-05T08:40:00.000Z",
+      "raisonCorbeille": "Veille : sous compromis (était coup de cœur)"
+    },
+    {
+      "num": 206,
+      "prio": 2,
+      "commune": "Ville Fictive",
+      "quartier": "Quartier test",
+      "prix": 389000,
+      "surface": 118,
+      "pieces": 5,
+      "chambres": 3,
+      "terrain": 350,
+      "dpe": "D",
+      "garage": false,
+      "lien": "https://example.com/annonce-206",
+      "source": "Site Fictif",
+      "repereeLe": "2026-09-15T18:00:00.000Z",
+      "score": 62,
+      "resume": "Retirée par la veille : fiche plus en ligne (test).",
+      "corbeille": true,
+      "corbeilleLe": "2026-10-04T19:00:00.000Z",
+      "statutLe": "2026-10-04T19:00:00.000Z",
+      "raisonCorbeille": "Veille : annonce plus en ligne",
+      "lienVerifieLe": "2026-09-28T19:00:00.000Z"
     },
     {
       "num": 199,
@@ -516,6 +540,20 @@
       "num": 103,
       "type": "Contact",
       "texte": "Passée en contact"
+    },
+    {
+      "le": "2026-10-04T19:00:00.000Z",
+      "num": 206,
+      "par": "Veille",
+      "type": "Corbeille",
+      "texte": "Mise à la corbeille : Veille : annonce plus en ligne"
+    },
+    {
+      "le": "2026-10-05T19:00:00.000Z",
+      "num": 112,
+      "par": "Veille",
+      "type": "Corbeille",
+      "texte": "Mise à la corbeille : Veille : sous compromis (était coup de cœur)"
     }
   ],
   "personnes": [

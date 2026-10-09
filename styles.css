@@ -168,7 +168,7 @@ a{color:inherit}
 .tag-pepite{background:var(--pepite-fond);color:var(--pepite-texte)}
 .tag-pepite::before{content:"★";margin-right:4px;font-size:10px}
 .tag-new{background:var(--surface);color:var(--encre)}
-.tag-nonverif{background:var(--creux);color:#605d5d;box-shadow:none}
+.tag-nonverif,.tag-retrait{background:var(--creux);color:#605d5d;box-shadow:none}
 .ligne-annonce .tag-new,.tableau .tag-new{background:var(--creux);box-shadow:none}
 .ligne-annonce .tag-pepite,.tableau .tag-pepite{box-shadow:none}
 .coeur{width:44px;height:44px;display:grid;place-items:center;color:var(--gris-clair);flex:none;border-radius:50%}
@@ -280,6 +280,12 @@ a{color:inherit}
 .fiche-meta{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;font-size:13px;color:var(--gris)}
 .fiche-etat-suivi{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--accent-600);background:var(--accent-100);border-radius:10px;padding:8px 12px}
 .fiche-etat-suivi .ico{width:15px;height:15px}
+/* Retrait par la veille : bandeau neutre (pas d'alerte), même gabarit que l'encart Hors critères. */
+.fiche-retrait{background:var(--creux);border-radius:14px;padding:10px 14px}
+.fr-titre{display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-size:14px;color:var(--encre)}
+.fr-titre .tag-retrait{background:var(--surface)}
+.fr-perdu{font-size:13px;color:var(--gris);margin-top:4px}
+.lien-verifie{color:var(--gris)}
 .fiche-prix{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
 .fiche-prix .prix{font-size:30px;font-weight:800;letter-spacing:-.03em;line-height:1.1}
 .fiche-prix .m2{font-size:14px;color:var(--gris);white-space:nowrap}
@@ -569,8 +575,14 @@ body.sans-onglets .message{bottom:calc(84px + env(safe-area-inset-bottom, 0px))}
   .corbeille{max-width:1280px;margin:0 auto;padding:0 28px 40px}
   .corbeille-tete{display:flex;align-items:baseline;gap:16px;padding:28px 6px 16px}
   .corbeille-tete h1{font-size:26px;font-weight:800;letter-spacing:-.02em}
+  .corbeille-groupe{padding:12px 6px 10px}
   .tableau-corbeille{background:var(--surface);border-radius:var(--r-carte);box-shadow:var(--ombre-1);overflow:hidden}
-  .tableau-corbeille td:last-child{width:140px}
+  .tableau-corbeille{table-layout:fixed;width:100%}
+  .tableau-corbeille th:nth-child(1){width:12%}
+  .tableau-corbeille th:nth-child(2){width:16%}
+  .tableau-corbeille th:nth-child(3){width:24%}
+  .tableau-corbeille th:nth-child(4){width:16%}
+  .tableau-corbeille th:last-child,.tableau-corbeille td:last-child{width:140px}
   .tableau-corbeille tbody tr{cursor:default}
   .tableau-corbeille .btn{min-height:36px;border-radius:var(--r-pilule)}
   .vide{padding:40px 28px}
@@ -620,6 +632,9 @@ body.sans-onglets .message{bottom:calc(84px + env(safe-area-inset-bottom, 0px))}
 .raison-corbeille{display:flex;gap:6px;align-items:flex-start;font-size:13px !important;color:var(--encre) !important;font-style:italic;margin-top:6px !important}
 .raison-corbeille .ico{width:14px;height:14px;margin-top:2px;color:var(--gris);flex:none}
 .t-raison{font-style:italic}
+.raison-retrait{display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:13px !important;color:var(--encre) !important;margin-top:6px !important}
+.tableau .raison-retrait{margin-top:0 !important}
+.corbeille-groupe{padding:18px var(--gouttiere) 0;font-size:12px;font-weight:700;color:var(--gris);text-transform:uppercase;letter-spacing:.06em}
 
 /* Fenêtre de confirmation : feuille du bas sur téléphone, fenêtre centrée sur ordinateur. */
 .couche-dialogue{z-index:60}

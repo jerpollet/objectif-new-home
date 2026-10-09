@@ -13,6 +13,10 @@
   var AUTRES = 5, NUMS_PRIO = [1, 2, 3, 4, 5];
   var MAX_NOTE = 2000, MAX_RAISON = 500, JOURNAL_VISIBLE = 5;
   var RAISONS_RAPIDES = ["Trop cher", "Trop de travaux", "Pas de jardin", "Mauvais quartier", "Déjà vendue"];
+  /* Retrait automatique : Corbeille à Oui et « Raison corbeille » qui commence par « Veille : » (posé par la veille seule). */
+  var PREFIXE_VEILLE = /^Veille[ \u00a0]:[ \u00a0]/;
+  var MOTIFS_VEILLE = {"annonce plus en ligne":"Plus en ligne", "vendue":"Vendue", "sous compromis":"Sous compromis", "sous offre":"Sous offre"};
+  var LIEN_A_REVERIFIER = 21;
   var TRIS = [
     {id:"pertinence", nom:"Pertinence", court:"Pertinence", sous:"Adéquation IA"},
     {id:"prixAsc", nom:"Prix croissant", court:"Prix ↑"},
@@ -94,6 +98,7 @@
   function dateCourte(iso){ return fmtDate(iso, {day:"numeric", month:"short"}); }
   function jourCourt(iso){ return fmtDate(iso, {weekday:"short", day:"numeric", month:"short"}); }
   function heure(iso){ var d = date(iso); return d ? d.toLocaleTimeString("fr-FR", {timeZone:"Europe/Paris", hour:"2-digit", minute:"2-digit"}) : ""; }
+  function jjmm(iso){ return fmtDate(iso, {day:"2-digit", month:"2-digit"}); }
   function majuscule(s){ return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
   function lsGet(k){ try { return localStorage.getItem(k); } catch(e){ return null; } }
   function lsSet(k, v){ try { localStorage.setItem(k, v); } catch(e){} }
@@ -223,12 +228,24 @@
     });
   }
   function annonces(){ return D ? D.annonces.filter(function(a){ return !a.masquee; }) : []; }
+  /* {motif, perdu} si la veille a retiré l'annonce (« Veille : sous compromis (était coup de cœur) »), sinon null. */
+  function retraitVeille(a){
+    var rc = txt(a && a.corbeille ? a.raisonCorbeille : "");
+    if (!PREFIXE_VEILLE.test(rc)) return null;
+    var reste = rc.replace(PREFIXE_VEILLE, "").trim(), perdu = null;
+    var m = /^(.*?)\s*\(([^()]*)\)$/.exec(reste);
+    if (m){ reste = m[1]; perdu = txt(m[2]) || null; }
+    return {motif:MOTIFS_VEILLE[reste.toLowerCase()] || majuscule(reste) || "Plus en ligne", perdu:perdu};
+  }
+  /* Le préfixe « Veille : » est réservé à la veille : retiré d'une raison saisie sur le site. */
+  function sansPrefixeVeille(t){ return txt(t).replace(/^(\s*veille\s*:\s*)+/i, "").trim(); }
   function enLice(){ return annonces().filter(function(a){ return !a.corbeille; }); }
   function parPrio(n){ return enLice().filter(function(a){ return a.prio === n; }); }
   function suivis(){ return enLice().filter(function(a){ return a.enContact; }); }
   /* Favoris : rangés par adéquation, puis par n°. */
   function parAdequation(x, y){ return comparerNb(x.score, y.score, true) || x.num - y.num; }
   function favoris(){ return enLice().filter(estFavori).sort(parAdequation); }
+  function ecarteesParNous(){ return dansCorbeille().filter(function(a){ return !retraitVeille(a); }); }
   function dansCorbeille(){
     return annonces().filter(function(a){ return a.corbeille; }).sort(function(x, y){
       return txt(y.corbeilleLe || y.statutLe).localeCompare(txt(x.corbeilleLe || x.statutLe));
@@ -334,7 +351,7 @@
         d.annonces.forEach(function(a){ var x = date(a.repereeLe); if (x && x.getTime() > max) max = x.getTime(); });
         var decal = max ? Date.now() - JOUR - max : 0;
         function recaler(o, k){ var x = date(o[k]); if (x) o[k] = new Date(x.getTime() + decal).toISOString(); }
-        d.annonces.forEach(function(a){ ["repereeLe","statutLe","enContactDepuis","corbeilleLe"].forEach(function(k){ recaler(a, k); }); });
+        d.annonces.forEach(function(a){ ["repereeLe","statutLe","enContactDepuis","corbeilleLe","lienVerifieLe"].forEach(function(k){ recaler(a, k); }); });
         (d.ajouts || []).forEach(function(x){ recaler(x, "ajouteLe"); });
         recaler(d.rapport, "derniereVeille");
         (d.journal || []).forEach(function(e){ recaler(e, "le"); });
@@ -432,15 +449,15 @@
           return test.attendre({ok:true, entree:test.copie(journaliser("Commentaire", txt(c.texte)))});
         }
         /* Même règle que changerStatut_ (Code.gs) : une ligne de journal seulement si le statut change. */
-        var t = null;
+        var t = null, raison = sansPrefixeVeille(c.raison);
         var pf = PERSONNES.filter(function(x){ return x.id === c.qui; })[0];
         if (c.action === "favori" && !pf) return test.attendre().then(function(){ throw erreur("Paramètre « qui » manquant ou inconnu."); });
         if (c.action === "favori" && !!c.valeur !== aime(a, pf)) t = ["Favori", (c.valeur ? "Ajoutée aux favoris de " : "Retirée des favoris de ") + pf.nom];
         else if (c.action === "contact" && !!c.valeur !== !!a.enContact) t = ["Contact", c.valeur ? "Ajoutée au suivi" : "Retirée du suivi"];
-        else if (c.action === "corbeille" && !a.corbeille) t = ["Corbeille", "Mise à la corbeille" + (txt(c.raison) ? " : " + txt(c.raison) : "")];
-        else if (c.action === "restaurer" && a.corbeille) t = ["Restauration", "Restaurée"];
+        else if (c.action === "corbeille" && !a.corbeille) t = ["Corbeille", "Mise à la corbeille" + (raison ? " : " + raison : "")];
+        else if (c.action === "restaurer" && a.corbeille) t = ["Corbeille", "Restaurée" + (txt(a.raisonCorbeille) ? " · ancienne raison : " + txt(a.raisonCorbeille) : "")];
         appliquerStatut(a, c.action, c.valeur, new Date().toISOString(), c.qui);
-        if (c.action === "corbeille" && txt(c.raison)) a.raisonCorbeille = txt(c.raison);
+        if (c.action === "corbeille" && raison) a.raisonCorbeille = raison;
         return test.attendre({ok:true, annonce:test.pourSite(a), journal:t ? [test.copie(journaliser(t[0], t[1]))] : []});
       });
     }
@@ -832,7 +849,7 @@
     return j + " · " + heure(iso);
   }
   var ICONES_JOURNAL = {Favori:"heart", Contact:"suivie", Corbeille:"trash", Restauration:"retour", Commentaire:"message"};
-  function icoEntree(e){ return ico(ICONES_JOURNAL[e.type] || "historique"); }
+  function icoEntree(e){ return ico(e.type === "Corbeille" && /^Restaurée/.test(txt(e.texte)) ? "retour" : (ICONES_JOURNAL[e.type] || "historique")); }
   function envoyerCommentaire(a, zone){
     var k = "journal-" + a.num, texte = txt(zone ? zone.value : S.brouillons[k]).slice(0, MAX_NOTE);
     if (!texte) return;
@@ -1296,6 +1313,20 @@
   }
   /* Fiche que la veille n'a pas pu ouvrir (Leboncoin, Bien'ici…) : lien présent, « Lien vérifié le » vide. */
   function lienNonVerifie(a){ return !!lienSur(a.lien) && !a.lienVerifieLe; }
+  /* « Lien vérifié le JJ/MM », « · à revérifier » au-delà de 21 jours (annonces affichées seulement). */
+  function lienVerifie(a){
+    var d = date(a.lienVerifieLe);
+    if (a.corbeille || !d || !lienSur(a.lien)) return null;
+    var vieux = Date.now() - d.getTime() > LIEN_A_REVERIFIER * JOUR;
+    return el("span", {classe:"lien-verifie", texte:"Lien vérifié le " + jjmm(a.lienVerifieLe) + (vieux ? " · à revérifier" : "")});
+  }
+  /* Bandeau d'une annonce retirée par la veille : « Plus disponible · Sous compromis · le 05/10 ». */
+  function bandeauRetrait(a, rv){
+    return el("div", {classe:"fiche-retrait"}, [
+      el("p", {classe:"fr-titre"}, [el("span", {classe:"tag tag-retrait", texte:"Plus disponible"}), el("b", {texte:rv.motif + " · le " + (jjmm(a.corbeilleLe || a.statutLe) || "?")})]),
+      rv.perdu ? el("p", {classe:"fr-perdu", texte:majuscule(rv.perdu)}) : null
+    ]);
+  }
   function anciennete(a){
     var d = date(a.repereeLe); if (!d) return null;
     var j = Math.floor((Date.now() - d.getTime()) / JOUR);
@@ -1306,11 +1337,13 @@
     var plus = Array.isArray(a.atouts) ? a.atouts : [], moins = Array.isArray(a.vigilance) ? a.vigilance : [];
     var ecarts = (Array.isArray(a.vigilanceCriteres) ? a.vigilanceCriteres : []).map(txt).filter(Boolean);
     var meta = ["n°" + a.num, sourceAffichee(a), anciennete(a)].filter(Boolean).join(" · ");
+    var rv = retraitVeille(a);
     return el("div", {classe:"fiche"}, [
       image(a, {classe:"fiche-img", direct:true}),
       el("div", {classe:"fiche-in"}, [
-        el("div", {classe:"fiche-meta"}, [badgePrio(a), el("span", {texte:meta}), lienNonVerifie(a) ? el("span", {classe:"tag tag-nonverif", texte:"Lien non vérifié"}) : null]),
-        a.corbeille ? el("p", {classe:"fiche-etat-suivi", texte:"Dans la corbeille depuis le " + (dateCourte(a.corbeilleLe || a.statutLe) || "?") + (txt(a.raisonCorbeille) ? " : " + txt(a.raisonCorbeille) : "")}) : null,
+        rv ? bandeauRetrait(a, rv) : null,
+        el("div", {classe:"fiche-meta"}, [badgePrio(a), el("span", {texte:meta}), lienNonVerifie(a) ? el("span", {classe:"tag tag-nonverif", texte:"Lien non vérifié"}) : lienVerifie(a)]),
+        a.corbeille && !rv ? el("p", {classe:"fiche-etat-suivi", texte:"Dans la corbeille depuis le " + (dateCourte(a.corbeilleLe || a.statutLe) || "?") + (txt(a.raisonCorbeille) ? " : " + txt(a.raisonCorbeille) : "")}) : null,
         a.enContact ? el("p", {classe:"fiche-etat-suivi"}, [ico("suivie"), " Suivi depuis le " + (dateCourte(a.enContactDepuis) || "?")]) : null,
         el("div", {classe:"fiche-prix"}, [el("span", {classe:"prix", texte:estNb(a.prix) ? euros(a.prix) : "Prix non précisé"}), m2 ? el("span", {classe:"m2", texte:nb(m2) + " €/m²"}) : null]),
         fc ? el("div", {classe:"fiche-fc"}, [el("b", {texte:"≈ " + kEuros(fc) + " frais compris"}), pastilleDrapeau(a)]) : null,
@@ -1733,7 +1766,10 @@
       if (renvoyable(r)) d += " · cocher pour renvoyer";
     }
     else if (r.etat === "LIEN_SUIVI") d = "Lien de suivi d'un mail : ouvrez l'annonce et copiez l'adresse de sa page";
-    else if (r.etat === "IGNOREE") d = "Dans la corbeille depuis le " + (dateCourte(r.corbeilleLe) || "?");
+    else if (r.etat === "IGNOREE"){
+      var rvi = retraitVeille(trouver(r.num));
+      d = rvi ? "Plus disponible (" + rvi.motif.toLowerCase() + ") depuis le " + (dateCourte(r.corbeilleLe) || "?") : "Dans la corbeille depuis le " + (dateCourte(r.corbeilleLe) || "?");
+    }
     else if (r.etat === "EN_ATTENTE") d = "Déjà envoyée" + (r.envoyeLe ? " le " + dateCourte(r.envoyeLe) : "") + ", pas encore analysée";
     else d = "Ce n'est pas un lien d'annonce";
     return d + (r.nb > 1 ? " · collé " + r.nb + " fois" : "");
@@ -1869,8 +1905,9 @@
   }
 
   /* ---------- Corbeille ---------- */
+  /* Deux groupes : nos décisions, puis les annonces retirées par la veille (plus disponibles). */
   function vueCorbeille(){
-    var l = dansCorbeille();
+    var l = dansCorbeille(), nous = l.filter(function(a){ return !retraitVeille(a); }), auto = l.filter(retraitVeille);
     var intro = "Gardées pour que la veille ne les repropose jamais.";
     var box = el("div", {classe:"corbeille"}, [S.bureau
       ? el("div", {classe:"corbeille-tete"}, [el("h1", {texte:"Corbeille"}), el("span", {classe:"gris", texte:pluriel(l.length, "annonce") + " · " + intro.charAt(0).toLowerCase() + intro.slice(1, -1)})])
@@ -1878,34 +1915,46 @@
     if (!D){ box.appendChild(squelettes("list")); return box; }
     if (!l.length){ box.appendChild(el("p", {classe:"vide", texte:"La corbeille est vide."})); return box; }
     function bouton(a){ return el("button", {type:"button", classe:"btn btn-contour", disabled:!!S.ops[a.num], onclick:function(){ restaurer(a); }}, ["Restaurer"]); }
-    function retiree(a){ return "Retirée le " + (dateCourte(a.corbeilleLe || a.statutLe) || "?") + " · " + courtPrio(a.prio); }
-    if (S.bureau){
-      box.appendChild(el("table", {classe:"tableau tableau-corbeille"}, [
-        el("thead", null, [el("tr", null, ["Prix","Quartier","Bien","Retirée","Raison",""].map(function(t){ return el("th", {scope:"col", texte:t}); }))]),
-        el("tbody", null, l.map(function(a){
-          return el("tr", null, [
-            el("td", {classe:"t-prix", texte:estNb(a.prix) ? euros(a.prix) : "—"}),
-            el("td", {classe:"t-lieu", texte:lieu(a)}),
-            el("td", {classe:"t-gris", texte:criteres(a).replace(/ · (à rafraîchir|à rénover)$/, "")}),
-            el("td", {classe:"t-gris", texte:retiree(a)}),
-            el("td", {classe:"t-raison" + (txt(a.raisonCorbeille) ? "" : " t-gris"), texte:txt(a.raisonCorbeille) || "—"}),
-            el("td", null, [bouton(a)])
-          ]);
-        }))
-      ]));
-    } else {
-      box.appendChild(el("div", {classe:"lignes-corbeille"}, l.map(function(a){
-        return el("div", {classe:"ligne-corbeille"}, [
-          el("div", null, [
-            el("b", {texte:(estNb(a.prix) ? euros(a.prix) : "Prix ?") + " · " + lieu(a)}),
-            el("p", {texte:criteres(a).replace(/ · (à rafraîchir|à rénover)$/, "")}),
-            txt(a.raisonCorbeille) ? el("p", {classe:"raison-corbeille"}, [ico("message"), el("span", {texte:txt(a.raisonCorbeille)})]) : null,
-            el("small", {texte:retiree(a)})
-          ]),
-          bouton(a)
-        ]);
-      })));
+    function retiree(a){ return (retraitVeille(a) ? "Retirée par la veille le " : "Retirée le ") + (dateCourte(a.corbeilleLe || a.statutLe) || "?") + " · " + courtPrio(a.prio); }
+    function raison(a){
+      var rv = retraitVeille(a);
+      if (rv) return el("p", {classe:"raison-retrait"}, [el("span", {classe:"tag tag-retrait", texte:"Plus disponible"}), el("span", {texte:rv.motif + (rv.perdu ? " · " + rv.perdu : "")})]);
+      return txt(a.raisonCorbeille) ? el("p", {classe:"raison-corbeille"}, [ico("message"), el("span", {texte:txt(a.raisonCorbeille)})]) : null;
     }
+    function groupe(titre, liste){
+      if (!liste.length) return;
+      box.appendChild(el("h2", {classe:"corbeille-groupe", texte:titre + " · " + liste.length}));
+      if (S.bureau){
+        box.appendChild(el("table", {classe:"tableau tableau-corbeille"}, [
+          el("thead", null, [el("tr", null, ["Prix","Quartier","Bien","Retirée","Raison",""].map(function(t){ return el("th", {scope:"col", texte:t}); }))]),
+          el("tbody", null, liste.map(function(a){
+            var rv = retraitVeille(a);
+            return el("tr", null, [
+              el("td", {classe:"t-prix", texte:estNb(a.prix) ? euros(a.prix) : "—"}),
+              el("td", {classe:"t-lieu", texte:lieu(a)}),
+              el("td", {classe:"t-gris", texte:criteres(a).replace(/ · (à rafraîchir|à rénover)$/, "")}),
+              el("td", {classe:"t-gris", texte:retiree(a)}),
+              rv ? el("td", null, [raison(a)]) : el("td", {classe:"t-raison" + (txt(a.raisonCorbeille) ? "" : " t-gris"), texte:txt(a.raisonCorbeille) || "—"}),
+              el("td", null, [bouton(a)])
+            ]);
+          }))
+        ]));
+      } else {
+        box.appendChild(el("div", {classe:"lignes-corbeille"}, liste.map(function(a){
+          return el("div", {classe:"ligne-corbeille"}, [
+            el("div", null, [
+              el("b", {texte:(estNb(a.prix) ? euros(a.prix) : "Prix ?") + " · " + lieu(a)}),
+              el("p", {texte:criteres(a).replace(/ · (à rafraîchir|à rénover)$/, "")}),
+              raison(a),
+              el("small", {texte:retiree(a)})
+            ]),
+            bouton(a)
+          ]);
+        })));
+      }
+    }
+    groupe("Écartées par nous", nous);
+    groupe("Plus disponibles", auto);
     return box;
   }
 
@@ -1917,7 +1966,10 @@
     if (r.nom === "suivi") return "Suivi · " + pluriel(suivis().length, "annonce");
     if (r.nom === "favoris") return "Favoris · " + pluriel(favoris().length, "annonce");
     if (r.nom === "comparer") return "Comparer · " + UI.compareIds.length + " / " + MAX_COMPARER;
-    if (r.nom === "corbeille") return "Corbeille · " + dansCorbeille().length;
+    if (r.nom === "corbeille"){
+      var nous = ecarteesParNous().length, auto = dansCorbeille().length - nous;
+      return "Corbeille · " + nous + (auto ? " · " + auto + " plus dispo." : "");
+    }
     return surtitreVeille();
   }
   function pageActive(){ return S.route.nom === "fiche" ? S.fond : S.route; }
@@ -1980,7 +2032,7 @@
         entree("suivi", "suivie", "Suivi", D ? String(suivis().length) : null),
         entree("comparer", "colonnes", "Comparer", UI.compareIds.length + " / " + MAX_COMPARER),
         entree("ajouter", "plus", "Ajouter des annonces", null),
-        entree("corbeille", "trash", "Corbeille", D ? String(dansCorbeille().length) : null, "menu-corbeille")
+        entree("corbeille", "trash", "Corbeille", D ? String(ecarteesParNous().length) : null, "menu-corbeille")
       ])
     ]);
   }
@@ -2076,9 +2128,10 @@
       pied = [
         el("button", {type:"button", classe:"btn btn-contour", onclick:fermerDialogue}, ["Annuler"]),
         el("button", {type:"button", classe:"btn btn-danger", onclick:function(){
-          var raison = txt(zone.value).slice(0, MAX_RAISON);
+          var brut = txt(zone.value), raison = sansPrefixeVeille(brut).slice(0, MAX_RAISON);
           delete S.brouillons[k]; S.dialogue = null;
           mettreCorbeille(a, raison);
+          if (raison !== brut.slice(0, MAX_RAISON)) message("« Veille : » est réservé à la veille : retiré de la raison");
         }}, [ico("trash"), el("span", {texte:"Mettre à la corbeille"})])
       ];
     } else {
@@ -2246,7 +2299,10 @@
       if (window.console) console.log("onhTests.partage", r.ok ? "OK" : "ÉCHEC", r);
       return r;
     },
-    texte:function(num){ var a = trouver(num); return a ? textePartage(a) : null; }
+    texte:function(num){ var a = trouver(num); return a ? textePartage(a) : null; },
+    /* Journal et statut d'une annonce, pour vérifier une restauration ou une raison de corbeille. */
+    journal:function(num){ return journalDe(num).map(function(e){ return {type:e.type, par:e.par || "", texte:e.texte}; }); },
+    statut:function(num){ var a = trouver(num); return a ? {corbeille:!!a.corbeille, raison:a.raisonCorbeille || null, retrait:retraitVeille(a)} : null; }
   };
 
   /* Plusieurs personnes modifient le même tableau : relire au retour au premier plan, au plus toutes les 30 s. */

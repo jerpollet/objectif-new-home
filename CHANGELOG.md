@@ -1,5 +1,16 @@
 # Changelog
 
+## V3.8 (annonces retirées par la veille)
+- Convention (posée par la veille seule, rien ne change dans le tableau) : retrait automatique = Corbeille à Oui et « Raison corbeille » qui commence par « Veille : » (« annonce plus en ligne », « vendue », « sous compromis », « sous offre »), suivie éventuellement d'une parenthèse sur ce que l'annonce a perdu (« (était coup de cœur, était en contact) »).
+- Corbeille en deux groupes : « Écartées par nous » puis « Plus disponibles ». Pour un retrait automatique : tag neutre « Plus disponible », motif court (Plus en ligne, Vendue, Sous compromis, Sous offre), parenthèse, « Retirée par la veille le … ». Nos propres mises à la corbeille : affichage inchangé.
+- Fiche d'une annonce retirée par la veille : bandeau neutre « Plus disponible · <motif> · le JJ/MM » (+ ce qu'elle a perdu), bouton Restaurer habituel.
+- Compteurs : le menu Corbeille ne compte que nos décisions ; le surtitre sépare (« Corbeille · 1 · 2 plus dispo. »). Ajouter : un lien déjà retiré par la veille s'affiche « Plus disponible (…) depuis le … ».
+- Raison saisie sur le site : un préfixe « Veille : » tapé à la main est retiré (site et API), avec un message.
+- Restauration : ligne de Journal Type « Corbeille » (au lieu de « Restauration »), texte « Restaurée » suivi de « · ancienne raison : … » quand il y en avait une. Les anciennes lignes « Restauration » restent lisibles.
+- Fiche d'une annonce affichée : « Lien vérifié le JJ/MM » dans la ligne du n°, « · à revérifier » au-delà de 21 jours (texte gris, pas d'alerte).
+- Données de test : n°111 « Trop cher », n°112 « Veille : sous compromis (était coup de cœur) », n°206 « Veille : annonce plus en ligne », n°202 vérifiée il y a 30 jours. Console : `onhTests.journal(n)`, `onhTests.statut(n)`.
+- Service worker : cache `onh-v3-8`.
+
 ## V3.7.2 (Suivre)
 - Vocabulaire : « Contact » devient « Suivre » / « Suivi » partout à l'écran (fiche, cartes, badge, « Suivi depuis le… », onglet Suivi, menu, comparateur, journal). Icône : œil fermé quand l'annonce n'est pas suivie, œil ouvert (accent) quand elle l'est, en écho à l'œil barré du filtre ; l'icône téléphone disparaît. Colonnes du tableau (« En contact », « En contact depuis »), clés et action API (`contact`) inchangées.
 - Cartes des Prio : « Comparer » passe à gauche, un bouton « Suivre » à droite (même action que dans la fiche) ; l'adéquation et la source ne sont plus affichées sur les cartes (toujours dans la fiche et le tri Pertinence).

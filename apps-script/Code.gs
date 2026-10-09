@@ -369,6 +369,8 @@ function changerStatut_(action, corps) {
 
   const maintenant = horodatage_();
   const maj = {};
+  // « Veille : » est réservé aux retraits automatiques de la veille : retiré d'une raison saisie sur le site.
+  const raison = String(corps.raison === undefined || corps.raison === null ? '' : corps.raison).replace(/^(\s*veille\s*:\s*)+/i, '').trim().slice(0, MAX_RAISON);
   if (action === 'favori' || action === 'contact') {
     if (avant.corbeille) throw new Error('Annonce n°' + num + ' dans la corbeille : restaurez-la d\'abord.');
   }
@@ -389,7 +391,6 @@ function changerStatut_(action, corps) {
     idx._personnes.forEach(p => { maj['fav:' + p.id] = ''; });
     maj.enContact = '';
     maj.enContactDepuis = '';
-    const raison = String(corps.raison === undefined || corps.raison === null ? '' : corps.raison).trim();
     if (raison) maj.raisonCorbeille = texteSur_(raison, MAX_RAISON);
   } else if (action === 'restaurer') {
     maj.corbeille = '';
@@ -413,9 +414,11 @@ function changerStatut_(action, corps) {
     texte = (corps.valeur ? 'Ajoutée aux favoris de ' : 'Retirée des favoris de ') + personne.nom;
   }
   else if (action === 'contact' && !!corps.valeur !== !!avant.enContact) texte = corps.valeur ? 'Ajoutée au suivi' : 'Retirée du suivi';
-  else if (action === 'corbeille' && !avant.corbeille) texte = 'Mise à la corbeille' + (maj.raisonCorbeille ? ' : ' + String(corps.raison).trim().slice(0, MAX_RAISON) : '');
-  else if (action === 'restaurer' && avant.corbeille) texte = 'Restaurée';
-  const types = { favori: 'Favori', contact: 'Contact', corbeille: 'Corbeille', restaurer: 'Restauration' };
+  else if (action === 'corbeille' && !avant.corbeille) texte = 'Mise à la corbeille' + (raison ? ' : ' + raison : '');
+  // Restauration : Type « Corbeille », texte « Restaurée · ancienne raison : <raison> ». La veille s'en sert pour ne pas
+  // retirer à nouveau l'annonce pour la même raison.
+  else if (action === 'restaurer' && avant.corbeille) texte = 'Restaurée' + (String(avant.raisonCorbeille || '').trim() ? ' · ancienne raison : ' + String(avant.raisonCorbeille).trim() : '');
+  const types = { favori: 'Favori', contact: 'Contact', corbeille: 'Corbeille', restaurer: 'Corbeille' };
   if (texte) journal.push(journaliser_(num, types[action], texte, ''));
 
   return { annonce: relireAnnonce_(L), journal: journal };

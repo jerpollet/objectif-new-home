@@ -159,3 +159,34 @@ Entre les étapes 3 et 4, l'ancien site (V3.6) n'affiche plus les cœurs ni les 
 | 4 | Claude Code | Vérifier l'API (`personnes`, `aimeePar`, `reglages.budget`), pousser `main`, attendre GitHub Pages, contrôler le site en lecture. |
 
 Retour arrière : revert du commit V3.7 sur `main`, puis Apps Script › ancienne version notée à l'étape 1. Rien à défaire dans le tableau.
+
+## 9. Conventions posées par la veille
+
+Le site ne crée aucune colonne : il reconnaît trois préfixes que seule la veille écrit, et l'API ou le site les interprètent.
+
+| Colonne | Préfixe | Sens | Lu par |
+|---|---|---|---|
+| Source | `Ajout de …` (« Ajout de Jérémy », « Ajout de Line ») | Ajout manuel : la source affichée devient le domaine du lien ; pas de refus au-delà de la tolérance. | API (`ajoutManuel`) |
+| Vigilance | `Écart : …` (une ligne par écart) | Écart à nos critères : bandeau « Hors de nos critères » et points en gras dans la fiche. | API (`vigilanceCriteres`) |
+| Raison corbeille | `Veille : <motif>` avec Corbeille à Oui | Retrait automatique : annonce plus disponible. Motifs : `annonce plus en ligne`, `vendue`, `sous compromis`, `sous offre`, suivis éventuellement de `(était coup de cœur, était en contact)`. Groupe « Plus disponibles » de la Corbeille, bandeau dans la fiche, exclus du compteur du menu. | Site (`retraitVeille`) |
+
+Règles :
+- « Veille : » est réservé : une raison saisie sur le site qui commence par « Veille : » (casse et espaces indifférents) perd ce préfixe, côté site et côté API.
+- Remise en ligne par la veille : Corbeille, Corbeille le et Raison corbeille vidés ; Journal Type « Corbeille », Par « Veille », texte « Remise en ligne : … ». Mise à la corbeille : même type, texte « Mise à la corbeille : Veille : … ».
+- Restauration depuis le site (V3.8) : Journal Type « Corbeille », Par vide, texte « Restaurée » ou « Restaurée · ancienne raison : <raison> ». La veille lit ce préfixe « Restaurée » pour ne pas retirer à nouveau l'annonce pour la même raison. Avant la V3.8, le type était « Restauration » (texte « Restaurée ») : la veille doit accepter les deux.
+- « Lien vérifié le » (`lienVerifieLe`) : affiché dans la fiche des annonces affichées ; au-delà de 21 jours, « à revérifier ».
+
+## 10. Bascule V3.8 (retraits automatiques)
+
+Aucune écriture dans le tableau. Site et API sont indépendants : l'ancien site fonctionne avec la nouvelle API et inversement
+(sans la nouvelle API, une restauration est journalisée en type « Restauration » et le préfixe « Veille : » n'est retiré que côté site).
+
+| # | Qui | Action |
+|---|---|---|
+| 1 | Jérémy | Noter la version actuellement déployée (§ 2, étape 2) : c'est la version de retour arrière. |
+| 2 | Jérémy | Apps Script : remplacer tout `Code.gs` par [`apps-script/Code.gs`](apps-script/Code.gs) (V3.8), enregistrer. ▶ `testerLecture` (`ok=true`). |
+| 3 | Jérémy | Déployer › Gérer les déploiements › crayon › **Nouvelle version** › Déployer (même URL `/exec`). |
+| 4 | Claude Code | Pousser `main`, attendre GitHub Pages, contrôler le site en lecture (Corbeille en deux groupes). |
+| 5 | Jérémy | Recette, sans écriture exprès : à la prochaine restauration faite depuis le site, vérifier la ligne du Journal (Type « Corbeille », texte « Restaurée… »). |
+
+Retour arrière : revert du commit V3.8 sur `main`, puis Apps Script › ancienne version notée à l'étape 1. Rien à défaire dans le tableau.

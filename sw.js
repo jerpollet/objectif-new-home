@@ -1,7 +1,7 @@
 /* Garde une copie du site pour qu'il s'ouvre sans réseau.
    Réseau d'abord (les mises à jour arrivent tout de suite), copie en secours.
    Les appels à l'API (script.google.com) ne passent jamais par ici. */
-var CACHE = "onh-v3-7-2";
+var CACHE = "onh-v3-8";
 var COQUILLE = ["./", "index.html", "styles.css", "app.js", "config.js", "manifest.webmanifest",
   "icones/icone.svg", "icones/icone-180.png", "icones/icone-192.png", "icones/icone-512.png"];
 
