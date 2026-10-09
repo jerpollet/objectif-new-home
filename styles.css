@@ -175,6 +175,14 @@ a{color:inherit}
 .coeur .ico{width:22px;height:22px}
 .coeur.actif{color:var(--favori)}
 .coeur:disabled{opacity:.4}
+.oeil{width:40px;height:44px;display:grid;place-items:center;color:var(--gris-clair);flex:none;border-radius:50%}
+.oeil .ico{width:22px;height:22px}
+.oeil.actif{color:var(--accent-600)}
+.oeil:disabled{opacity:.4}
+.ligne-annonce .oeil{margin-right:-8px}
+.t-coeur{white-space:nowrap}
+.t-coeur .oeil{display:inline-grid;vertical-align:middle;margin:-8px 0}
+.t-coeur .coeur{display:inline-grid;vertical-align:middle}
 .coeur-boite{position:absolute;top:6px;right:6px;z-index:1;background:transparent}
 .coeur-boite::before{content:"";position:absolute;inset:5px;border-radius:50%;background:rgba(255,255,255,.94);box-shadow:0 1px 3px rgba(0,0,0,.15)}
 .coeur-boite .ico{position:relative;width:18px;height:18px;color:var(--encre)}

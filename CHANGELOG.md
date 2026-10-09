@@ -1,10 +1,10 @@
 # Changelog
 
 ## V3.7.2 (Suivre)
-- Vocabulaire : « Contact » devient « Suivre » / « Suivi » partout à l'écran (fiche, cartes, badge, « Suivi depuis le… », onglet Suivi, menu, comparateur, journal). Icône : coche dans un cercle pointillé quand l'annonce n'est pas suivie, cercle plein quand elle l'est ; l'icône téléphone disparaît. Colonnes du tableau (« En contact », « En contact depuis »), clés et action API (`contact`) inchangées.
+- Vocabulaire : « Contact » devient « Suivre » / « Suivi » partout à l'écran (fiche, cartes, badge, « Suivi depuis le… », onglet Suivi, menu, comparateur, journal). Icône : œil fermé quand l'annonce n'est pas suivie, œil ouvert (accent) quand elle l'est, en écho à l'œil barré du filtre ; l'icône téléphone disparaît. Colonnes du tableau (« En contact », « En contact depuis »), clés et action API (`contact`) inchangées.
 - Cartes des Prio : « Comparer » passe à gauche, un bouton « Suivre » à droite (même action que dans la fiche) ; l'adéquation et la source ne sont plus affichées sur les cartes (toujours dans la fiche et le tri Pertinence).
 - Prio et Autres : filtre « Masquer les annonces suivies » (œil barré) dans la barre d'outils, mémorisé comme Favoris et New. Sur mobile, Favoris et ce filtre sont en icône seule ; la barre est resserrée sous 430 px pour tenir sans défiler.
-- Vue liste (mobile et tableau) : tag « Suivi » non cliquable sur les annonces suivies.
+- Vue liste (mobile et tableau) : œil cliquable à côté du cœur pour suivre ou retirer du suivi (colonne « Suivi · Favori » sur ordinateur).
 - Journal : la ligne automatique dit « Ajoutée au suivi » (au lieu de « Passée en contact ») ; à recopier dans Apps Script pour les écritures réelles, les anciennes lignes restent telles quelles.
 - Service worker : cache `onh-v3-7-2`.
 

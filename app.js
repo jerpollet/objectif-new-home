@@ -49,10 +49,9 @@
     x:'<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
     maison:'<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
     check:'<path d="M20 6 9 17l-5-5"/>',
-    /* Suivre : coche dans un cercle pointillé ; suivie : cercle plein, coche de la couleur du texte sur accent. */
-    masquer:'<path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/>',
-    suivre:'<circle cx="12" cy="12" r="10" stroke-dasharray="3.5 2.78"/><path d="m8.5 12 2.5 2.5 4.5-5"/>',
-    suivie:'<circle cx="12" cy="12" r="10" fill="currentColor"/><path d="m8.5 12 2.5 2.5 4.5-5" style="stroke:var(--accent-texte)"/>',
+    /* Suivre : œil fermé ; suivi : œil ouvert (le filtre « masquer les suivis » est l'œil barré). */
+    suivre:'<path d="m15 18-.722-3.25"/><path d="M2 8a10.645 10.645 0 0 0 20 0"/><path d="m20 15-1.726-2.05"/><path d="m4 15 1.726-2.05"/><path d="m9 18 .722-3.25"/>',
+    suivie:'<path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>',
     alerte:'<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
     cible:'<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
     tri:'<path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/>',
@@ -913,14 +912,12 @@
   }
 
   /* ---------- Briques d'affichage ---------- */
-  /* avecSuivi : vue liste et tableau seulement (indicatif, pas cliquable). */
-  function tags(a, avecSuivi){
+  function tags(a){
     var t = [];
     /* Ordre fixe : New › Coup de cœur › Pépite (jamais de Pépite en Autres). */
     if (estNew(a)) t.push(el("span", {classe:"tag tag-new", texte:"New"}));
     if (estCoupDeCoeur(a)) t.push(tagCoupDeCoeur());
     if (a.pepite && a.prio !== AUTRES) t.push(el("span", {classe:"tag tag-pepite", texte:"Pépite"}));
-    if (avecSuivi && a.enContact) t.push(tagSuivi());
     return t.length ? el("div", {classe:"tags"}, t) : null;
   }
   function tagSuivi(){ return el("span", {classe:"tag tag-contact"}, [ico("suivie"), "Suivi"]); }
@@ -955,6 +952,12 @@
     return el("button", {type:"button", classe:"coeur" + (classe ? " " + classe : "") + (f ? " actif" : ""), "aria-haspopup":"dialog",
       "aria-label":"Qui l'aime ? Annonce n°" + a.num + (f ? ", " + aimeePar(a).toLowerCase() : ", personne pour l'instant"), disabled:a.corbeille,
       onclick:function(e){ e.stopPropagation(); ouvrirQuiAime(a, this); }}, [ico("heart", f), initiales(a)]);
+  }
+  /* Œil Suivre / Suivi de la vue liste, à côté du cœur. */
+  function oeil(a){
+    return el("button", {type:"button", classe:"oeil" + (a.enContact ? " actif" : ""), "aria-pressed":a.enContact ? "true" : "false", disabled:a.corbeille,
+      "aria-label":(a.enContact ? "Suivie, retirer du suivi" : "Suivre") + " l'annonce n°" + a.num, title:a.enContact ? "Suivi" : "Suivre",
+      onclick:function(e){ e.stopPropagation(); basculerContact(a); }}, [ico(a.enContact ? "suivie" : "suivre")]);
   }
   /* ---------- Partager une annonce ---------- */
   /* Lien de fiche SANS la clé d'accès : le message part dans WhatsApp ou un SMS. Ne pas utiliser hashPour(). */
@@ -1105,9 +1108,10 @@
     var m2 = estNb(a.surface) ? " · " + nb(a.surface) + " m²" : "";
     return cliquable(el("div", {classe:"ligne-annonce"}, [
       el("div", {classe:"la-txt"}, [
-        el("div", {classe:"la-haut"}, [el("span", {classe:"la-prix", texte:estNb(a.prix) ? euros(a.prix) : "Prix ?"}), tags(a, true)]),
+        el("div", {classe:"la-haut"}, [el("span", {classe:"la-prix", texte:estNb(a.prix) ? euros(a.prix) : "Prix ?"}), tags(a)]),
         el("div", {classe:"la-lieu"}, [el("b", {texte:lieu(a)}), m2])
       ]),
+      oeil(a),
       coeur(a)
     ]), a.num);
   }
@@ -1121,13 +1125,13 @@
         el("td", {classe:"t-lieu", texte:lieu(a)}),
         el("td", {texte:estNb(a.surface) ? nb(a.surface) + " m²" : "—"}),
         el("td", {texte:estNb(a.chambres) ? String(a.chambres) : "—"}),
-        el("td", null, [tags(a, true)]),
+        el("td", null, [tags(a)]),
         el("td", {classe:"t-gris", texte:courtPrio(a.prio) + " · " + (sourceAffichee(a) || "—")}),
-        el("td", {classe:"t-coeur"}, [coeur(a)])
+        el("td", {classe:"t-coeur"}, [oeil(a), coeur(a)])
       ]), a.num));
     });
     return el("div", {classe:"tableau-defil"}, [el("table", {classe:"tableau"}, [
-      el("thead", null, [el("tr", null, ["Prix","€/m²","Quartier","Surface","Ch.","Tags","Prio · source","Favori"].map(function(t){ return el("th", {scope:"col", texte:t}); }))]),
+      el("thead", null, [el("tr", null, ["Prix","€/m²","Quartier","Surface","Ch.","Tags","Prio · source","Suivi · Favori"].map(function(t){ return el("th", {scope:"col", texte:t}); }))]),
       corps
     ])]);
   }
