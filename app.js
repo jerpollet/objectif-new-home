@@ -188,7 +188,7 @@
     cle:null, api:CONFIG.API_URL, route:{nom:"accueil"}, fond:{nom:"accueil"}, fichePush:false,
     bureau:false, menu:false, tri:null, triBrouillon:null, choix:false,
     chargement:false, echec:false, dernierEssai:0, erreurTexte:"",
-    ops:{}, files:{}, dialogue:null, brouillons:{}, journalTout:{}, rendreEnAttente:false, appui:false,
+    ops:{}, opsAction:{}, files:{}, dialogue:null, brouillons:{}, journalTout:{}, rendreEnAttente:false, appui:false,
     ajout:{texte:"", resultats:null, coches:{}, verif:false, envoi:false, fait:null}
   };
   var D = null;
@@ -292,13 +292,20 @@
 
   /* ---------- Messages en bas d'écran ---------- */
   var minuteur = null;
+  /* genre « attente » : roue + texte, reste affiché jusqu'au message suivant (25 s au plus, délai de l'API). */
   function message(t, genre){
     var z = $("message");
-    z.textContent = t || ""; z.hidden = !t;
-    z.className = "message" + (genre === "erreur" ? " erreur" : "");
+    z.textContent = ""; z.hidden = !t;
+    if (genre === "attente") z.appendChild(roue());
+    if (t) z.appendChild(document.createTextNode(t));
+    z.className = "message" + (genre === "erreur" ? " erreur" : genre === "attente" ? " attente" : "");
     clearTimeout(minuteur);
-    if (t) minuteur = setTimeout(function(){ z.hidden = true; }, genre === "erreur" ? 6000 : 2600);
+    if (t) minuteur = setTimeout(function(){ z.hidden = true; }, genre === "erreur" ? 6000 : genre === "attente" ? DELAI_MAX : 2600);
   }
+  /* Loader infini des enregistrements en cours (1 à 3 s pour Apps Script). */
+  function roue(){ return el("span", {classe:"roue", "aria-hidden":"true"}); }
+  /* L'annonce a-t-elle une écriture de ce type en cours ? (statut déjà affiché, enregistrement pas encore confirmé) */
+  function enCours(a, action){ return !!S.ops[a.num] && S.opsAction[a.num] === action; }
   $("message").addEventListener("click", function(){ this.hidden = true; });
 
   /* ---------- API ---------- */
@@ -619,6 +626,7 @@
     if (action === "corbeille" && raison) a.raisonCorbeille = raison;
     if (action === "corbeille") nettoyerComparer();
     S.ops[num] = (S.ops[num] || 0) + 1;
+    S.opsAction[num] = action;
     rendre();
     if (apres) apres();
     /* Une file par annonce : deux appuis rapides partent dans l'ordre. */
@@ -630,7 +638,8 @@
       return ecrire(corps).then(function(r){
         S.ops[num]--;
         if (!S.ops[num]){
-          delete S.ops[num];
+          delete S.ops[num]; delete S.opsAction[num];
+          if (extra.fait) extra.fait();
           if (r.annonce && r.annonce.num === num){
             var b = trouver(num) || a;
             CHAMPS_STATUT.forEach(function(k){ if (k in r.annonce) b[k] = r.annonce[k]; else delete b[k]; });
@@ -639,7 +648,7 @@
         (Array.isArray(r.journal) ? r.journal : []).forEach(ajouterEntree);
         ecrireCache(); rendre();
       }, function(e){
-        S.ops[num]--; if (!S.ops[num]) delete S.ops[num];
+        S.ops[num]--; if (!S.ops[num]){ delete S.ops[num]; delete S.opsAction[num]; }
         if (e.cle){ cleInvalide(); return; }
         var b = trouver(num) || a;
         CHAMPS_STATUT.forEach(function(k){ if (k in avant) b[k] = avant[k]; else delete b[k]; });
@@ -654,10 +663,13 @@
   function mettreCorbeille(a, raison){
     changerStatut(a, "corbeille", true, function(){
       if (S.route.nom === "fiche" && S.route.num === a.num) fermerFiche();
-      message("Mise à la corbeille");
-    }, {raison:raison});
+      message("Mise à la corbeille…", "attente");
+    }, {raison:raison, fait:function(){ message("Mise à la corbeille"); }});
   }
-  function restaurer(a){ changerStatut(a, "restaurer", true, function(){ message("Restaurée dans " + (a.prio === AUTRES ? nomPrio(AUTRES) : "la Prio " + a.prio)); }); }
+  function restaurer(a){
+    var ou = a.prio === AUTRES ? nomPrio(AUTRES) : "la Prio " + a.prio;
+    changerStatut(a, "restaurer", true, function(){ message("Restauration dans " + ou + "…", "attente"); }, {fait:function(){ message("Restaurée dans " + ou); }});
+  }
   /* Corbeille : fenêtre de confirmation, avec une raison facultative (colonne « Raison corbeille »). */
   function boutonCorbeille(a, classe, contenu){
     return el("button", {type:"button", classe:classe, "aria-label":"Mettre à la corbeille", "aria-haspopup":"dialog",
@@ -785,17 +797,18 @@
     if (v) a.notes = v; else delete a.notes;
     delete S.brouillons[cleNote(a)];
     S.ops[num] = (S.ops[num] || 0) + 1;
+    S.opsAction[num] = "note";
     demanderRendu();
     S.files[num] = (S.files[num] || Promise.resolve()).then(function(){
       return ecrire({action:"note", num:num, texte:v}).then(function(r){
-        S.ops[num]--; if (!S.ops[num]) delete S.ops[num];
+        S.ops[num]--; if (!S.ops[num]){ delete S.ops[num]; delete S.opsAction[num]; }
         var b = trouver(num) || a;
         if (r.annonce && r.annonce.num === num){ if (txt(r.annonce.notes)) b.notes = r.annonce.notes; else delete b.notes; }
         ecrireCache();
         message(v ? "Note enregistrée" : "Note vidée");
         demanderRendu();
       }, function(e){
-        S.ops[num]--; if (!S.ops[num]) delete S.ops[num];
+        S.ops[num]--; if (!S.ops[num]){ delete S.ops[num]; delete S.opsAction[num]; }
         if (e.cle){ cleInvalide(); return; }
         var b = trouver(num) || a;
         if (avant === undefined) delete b.notes; else b.notes = avant;
@@ -811,7 +824,8 @@
       placeholder:"Mémo pour vous deux : contact de l'agence, questions à poser…"});
     zone.value = valeur;
     var bouton = el("button", {type:"button", classe:"btn btn-encre btn-petit", disabled:!modifiee, onclick:function(){ enregistrerNote(a, zone.value); }}, ["Enregistrer"]);
-    var etat = el("span", {classe:"note-etat", texte:S.ops[a.num] ? "Enregistrement…" : modifiee ? "Modifiée, pas encore enregistrée" : ""});
+    var etat = S.ops[a.num] && S.opsAction[a.num] === "note" ? el("span", {classe:"note-etat"}, [roue(), "Enregistrement…"])
+      : el("span", {classe:"note-etat", texte:modifiee ? "Modifiée, pas encore enregistrée" : ""});
     zone.addEventListener("input", function(){
       S.brouillons[k] = zone.value;
       var m = zone.value.trim() !== txt(a.notes);
@@ -884,7 +898,7 @@
       return el("li", {classe:"j-entree j-commentaire" + (e.local ? " j-envoi" : "")}, [
         el("span", {classe:"j-pastille"}, [icoEntree(e)]),
         el("div", {classe:"j-corps"}, [
-          el("p", {classe:"j-ligne"}, [el("b", {texte:auteur || "Commentaire"}), el("time", {datetime:e.le, texte:" · " + (e.local ? "envoi…" : quand(e.le))})]),
+          el("p", {classe:"j-ligne"}, [el("b", {texte:auteur || "Commentaire"}), e.local ? el("span", {classe:"j-attente"}, [" · ", roue(), "envoi…"]) : el("time", {datetime:e.le, texte:" · " + quand(e.le)})]),
           el("p", {classe:"j-bulle", texte:txt(e.texte)})
         ])
       ]);
@@ -968,13 +982,13 @@
     var f = estFavori(a);
     return el("button", {type:"button", classe:"coeur" + (classe ? " " + classe : "") + (f ? " actif" : ""), "aria-haspopup":"dialog",
       "aria-label":"Qui l'aime ? Annonce n°" + a.num + (f ? ", " + aimeePar(a).toLowerCase() : ", personne pour l'instant"), disabled:a.corbeille,
-      onclick:function(e){ e.stopPropagation(); ouvrirQuiAime(a, this); }}, [ico("heart", f), initiales(a)]);
+      "aria-busy":enCours(a, "favori") ? "true" : null, onclick:function(e){ e.stopPropagation(); ouvrirQuiAime(a, this); }}, [enCours(a, "favori") ? roue() : ico("heart", f), initiales(a)]);
   }
   /* Œil Suivre / Suivi de la vue liste, à côté du cœur. */
   function oeil(a){
     return el("button", {type:"button", classe:"oeil" + (a.enContact ? " actif" : ""), "aria-pressed":a.enContact ? "true" : "false", disabled:a.corbeille,
       "aria-label":(a.enContact ? "Suivie, retirer du suivi" : "Suivre") + " l'annonce n°" + a.num, title:a.enContact ? "Suivi" : "Suivre",
-      onclick:function(e){ e.stopPropagation(); basculerContact(a); }}, [ico(a.enContact ? "suivie" : "suivre")]);
+      "aria-busy":enCours(a, "contact") ? "true" : null, onclick:function(e){ e.stopPropagation(); basculerContact(a); }}, [enCours(a, "contact") ? roue() : ico(a.enContact ? "suivie" : "suivre")]);
   }
   /* ---------- Partager une annonce ---------- */
   /* Lien de fiche SANS la clé d'accès : le message part dans WhatsApp ou un SMS. Ne pas utiliser hashPour(). */
@@ -1044,7 +1058,7 @@
   /* Bouton Suivre / Suivi des cartes (même action que dans la fiche). */
   function boutonSuivre(a){
     return el("button", {type:"button", classe:"carte-suivre" + (a.enContact ? " actif" : ""), "aria-pressed":a.enContact ? "true" : "false",
-      onclick:function(e){ e.stopPropagation(); basculerContact(a); }}, [ico(a.enContact ? "suivie" : "suivre"), el("span", {texte:a.enContact ? "Suivi" : "Suivre"})]);
+      "aria-busy":enCours(a, "contact") ? "true" : null, onclick:function(e){ e.stopPropagation(); basculerContact(a); }}, [enCours(a, "contact") ? roue() : ico(a.enContact ? "suivie" : "suivre"), el("span", {texte:a.enContact ? "Suivi" : "Suivre"})]);
   }
   /* Ligne « ≈ X k€ frais compris » + drapeau, sous le prix. */
   function ligneFraisCompris(a){
@@ -1382,8 +1396,8 @@
     }
     return el("div", {classe:"fiche-actions"}, [
       el("button", {type:"button", classe:"act act-favori" + (estFavori(a) ? " favori-actif" : ""), "aria-haspopup":"dialog", "aria-label":"Qui l'aime ?" + (estFavori(a) ? " " + aimeePar(a) : ""),
-        onclick:function(){ ouvrirQuiAime(a, this); }}, [el("span", {classe:"act-coeur"}, [ico("heart", estFavori(a)), initiales(a)]), el("span", {texte:"Favori"})]),
-      el("button", {type:"button", classe:"act" + (a.enContact ? " actif" : ""), "aria-pressed":a.enContact ? "true" : "false", onclick:function(){ basculerContact(a); }}, [ico(a.enContact ? "suivie" : "suivre"), el("span", {texte:a.enContact ? "Suivi" : "Suivre"})]),
+        onclick:function(){ ouvrirQuiAime(a, this); }}, [el("span", {classe:"act-coeur"}, [enCours(a, "favori") ? roue() : ico("heart", estFavori(a)), initiales(a)]), el("span", {texte:"Favori"})]),
+      el("button", {type:"button", classe:"act" + (a.enContact ? " actif" : ""), "aria-pressed":a.enContact ? "true" : "false", onclick:function(){ basculerContact(a); }}, [enCours(a, "contact") ? roue() : ico(a.enContact ? "suivie" : "suivre"), el("span", {texte:a.enContact ? "Suivi" : "Suivre"})]),
       el("button", {type:"button", classe:"act" + (dansComp ? " actif" : ""), "aria-pressed":dansComp ? "true" : "false", disabled:plein, title:plein ? "3 annonces au plus" : null, onclick:function(){ basculerComparer(a.num); }}, [ico("colonnes"), el("span", {texte:"Comparer"})]),
       boutonCorbeille(a, "act", [ico("trash"), el("span", {texte:"Corbeille"})]),
       lienAnnonce(a, "act-cta", [el("span", {texte:S.bureau ? "Voir l'annonce" : "Annonce"}), ico("externe")])
@@ -1824,8 +1838,9 @@
       var n = extraireEntrees(zone.value).length;
       btnVerif.disabled = !n || A.verif || sansCle;
       btnVerif.textContent = "";
+      if (A.verif) btnVerif.appendChild(roue());
       btnVerif.appendChild(el("span", {texte:A.verif ? "Vérification…" : "Vérifier " + pluriel(n, "lien")}));
-      btnVerif.appendChild(ico("fleche"));
+      if (!A.verif) btnVerif.appendChild(ico("fleche"));
     }
     zone.addEventListener("input", function(){
       A.texte = zone.value;
@@ -1872,7 +1887,8 @@
     box.appendChild(el("p", {classe:"note", texte:"Vérification sur le lien exact : une même maison publiée par une autre agence sera repérée par la veille."}));
     var n = nbCoches();
     box.appendChild(el("div", {classe:"envoi"}, [el("button", {type:"button", classe:"btn btn-accent btn-large", disabled:!n || A.envoi, onclick:envoyerAjouts}, [
-      el("span", {texte:A.envoi ? "Envoi…" : n ? "Envoyer " + pluriel(n, "annonce") + " à la veille" : "Aucune annonce à envoyer"}), ico("fleche")
+      A.envoi ? roue() : null,
+      el("span", {texte:A.envoi ? "Envoi…" : n ? "Envoyer " + pluriel(n, "annonce") + " à la veille" : "Aucune annonce à envoyer"}), A.envoi ? null : ico("fleche")
     ])]));
     return box;
   }

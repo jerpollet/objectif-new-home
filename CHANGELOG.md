@@ -1,5 +1,11 @@
 # Changelog
 
+## V3.8.1 (loaders pendant les enregistrements)
+- Les statuts restent optimistes (affichés tout de suite) ; pendant l'enregistrement dans le tableau (1 à 3 s pour Apps Script), une petite roue infinie remplace l'icône du bouton concerné : œil (liste), « Suivre » (cartes, fiche), cœur (cartes, liste, fiche). Elle disparaît à la confirmation du tableau.
+- Corbeille et restauration : message « Mise à la corbeille… » / « Restauration dans … » avec roue, remplacé par la confirmation quand le tableau a répondu (erreur : message rouge et retour en arrière, comme avant).
+- Note (« Enregistrement… »), commentaire du journal (« envoi… »), Ajouter (« Vérification… », « Envoi… ») : roue devant le texte.
+- Service worker : cache `onh-v3-8-1`.
+
 ## V3.8 (annonces retirées par la veille)
 - Convention (posée par la veille seule, rien ne change dans le tableau) : retrait automatique = Corbeille à Oui et « Raison corbeille » qui commence par « Veille : » (« annonce plus en ligne », « vendue », « sous compromis », « sous offre »), suivie éventuellement d'une parenthèse sur ce que l'annonce a perdu (« (était coup de cœur, était en contact) »).
 - Corbeille en deux groupes : « Écartées par nous » puis « Plus disponibles ». Pour un retrait automatique : tag neutre « Plus disponible », motif court (Plus en ligne, Vendue, Sous compromis, Sous offre), parenthèse, « Retirée par la veille le … ». Nos propres mises à la corbeille : affichage inchangé.

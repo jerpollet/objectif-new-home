@@ -58,6 +58,18 @@ a{color:inherit}
 .barre-charge i{position:absolute;top:0;left:0;height:100%;width:38%;background:var(--accent);border-radius:3px;animation:defile 1.4s ease-in-out infinite}
 @keyframes defile{from{transform:translateX(-100%)}to{transform:translateX(265%)}}
 @media (prefers-reduced-motion:reduce){.barre-charge i{animation-duration:4s}}
+/* Loader infini : anneau qui tourne, de la couleur du texte, à la place de l'icône le temps d'un enregistrement. */
+.roue{display:inline-block;width:16px;height:16px;flex:none;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;opacity:.75;animation:tourne .7s linear infinite;vertical-align:middle}
+@keyframes tourne{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.roue{animation-duration:2s}}
+.coeur .roue,.oeil .roue,.act .roue{width:20px;height:20px}
+.coeur-boite .roue{position:relative;width:16px;height:16px;color:var(--encre)}
+.coeur.actif .roue{color:var(--favori)}
+.carte-suivre .roue{width:16px;height:16px}
+.btn .roue{width:16px;height:16px;margin-right:2px}
+.message.attente{display:flex;align-items:center;gap:10px}
+.message .roue{width:14px;height:14px}
+.note-etat .roue,.j-attente .roue{width:11px;height:11px;border-width:1.5px;margin-right:5px}
 .bandeau-echec{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--cible-fond);color:var(--cible-texte);padding:10px var(--gouttiere);font-size:13px;font-weight:500}
 .bandeau-echec button{flex:none;min-height:32px;color:var(--encre)}
 
