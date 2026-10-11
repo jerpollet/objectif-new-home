@@ -54,6 +54,7 @@
     maison:'<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
     check:'<path d="M20 6 9 17l-5-5"/>',
     /* Suivre : œil fermé ; suivi : œil ouvert (le filtre « masquer les suivis » est l'œil barré). */
+    masquer:'<path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/>',
     suivre:'<path d="m15 18-.722-3.25"/><path d="M2 8a10.645 10.645 0 0 0 20 0"/><path d="m20 15-1.726-2.05"/><path d="m4 15 1.726-2.05"/><path d="m9 18 .722-3.25"/>',
     suivie:'<path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>',
     alerte:'<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
@@ -1043,6 +1044,12 @@
     if (!url) return el("span", {classe:classe + " sans-lien", "aria-disabled":"true"}, ["Pas de lien"]);
     return el("a", {classe:classe, href:url, target:"_blank", rel:"noopener noreferrer", onclick:function(e){ e.stopPropagation(); }}, contenu);
   }
+  /* Raccourci vers l'annonce, en bas à droite des cartes (rien si pas de lien). */
+  function lienCarte(a){
+    var url = lienSur(a.lien);
+    return url ? el("a", {classe:"carte-lien", href:url, target:"_blank", rel:"noopener noreferrer", "aria-label":"Voir l'annonce n°" + a.num + " (nouvel onglet)", title:"Voir l'annonce",
+      onclick:function(e){ e.stopPropagation(); }}, [ico("externe")]) : null;
+  }
   function cliquable(noeud, num){
     noeud.setAttribute("tabindex", "0");
     noeud.setAttribute("role", "link");
@@ -1089,7 +1096,7 @@
       ligneCriteres(a),
       suivi
         ? el("div", {classe:"carte-contact"}, [ico("suivie"), el("span", {texte:"Suivi depuis le " + (dateCourte(a.enContactDepuis) || "?")})])
-        : el("div", {classe:"carte-bas"}, [caseComparer(a), boutonSuivre(a)]),
+        : el("div", {classe:"carte-bas"}, [caseComparer(a), el("div", {classe:"carte-bas-droite"}, [boutonSuivre(a), lienCarte(a)])]),
       suivi ? derniereActivite(a) : null
     ]);
     var art = el("article", {classe:"carte" + (choisie ? " choisie" : "") + (suivi ? " carte-suivi" : ""), "aria-label":lieu(a) + ", " + (estNb(a.prix) ? euros(a.prix) : "prix non précisé")}, [

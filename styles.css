@@ -228,6 +228,12 @@ a{color:inherit}
 .carte-crit{font-size:13px;color:var(--gris)}
 .carte-bas{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px;padding-top:10px;border-top:1px solid var(--ligne)}
 .carte-suivre{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--gris);min-height:44px;margin:-8px -6px -10px 0;padding:0 6px;border-radius:var(--r-btn);white-space:nowrap;flex:none}
+.carte-bas-droite{display:flex;align-items:center;gap:6px;flex:none}
+.carte-bas-droite .carte-lien{margin:-8px -10px -10px 0}
+.carte-lien{width:40px;height:44px;display:grid;place-items:center;color:var(--gris);border-radius:var(--r-btn);flex:none}
+.carte-lien .ico{width:18px;height:18px}
+.carte-lien:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.carte-bas-droite .carte-suivre{margin-right:0}
 .carte-suivre .ico{width:18px;height:18px;color:var(--gris-clair)}
 .carte-suivre.actif,.carte-suivre.actif .ico{color:var(--accent-600)}
 .carte-suivre:focus-visible{outline:2px solid var(--accent);outline-offset:2px}

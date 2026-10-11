@@ -1,5 +1,10 @@
 # Changelog
 
+## V3.8.2 (raccourci vers l'annonce)
+- Cartes des Prio : icône « lien externe » en bas à droite, qui ouvre l'annonce dans un nouvel onglet (sans ouvrir la fiche) ; « Suivre / Suivi » se décale à sa gauche. Pas d'icône si l'annonce n'a pas de lien.
+- Correctif : l'icône œil barré du filtre « Masquer les annonces suivies » avait disparu depuis la V3.7.2 (puce vide) ; elle est rétablie.
+- Service worker : cache `onh-v3-8-2`.
+
 ## V3.8.1 (loaders pendant les enregistrements)
 - Les statuts restent optimistes (affichés tout de suite) ; pendant l'enregistrement dans le tableau (1 à 3 s pour Apps Script), une petite roue infinie remplace l'icône du bouton concerné : œil (liste), « Suivre » (cartes, fiche), cœur (cartes, liste, fiche). Elle disparaît à la confirmation du tableau.
 - Corbeille et restauration : message « Mise à la corbeille… » / « Restauration dans … » avec roue, remplacé par la confirmation quand le tableau a répondu (erreur : message rouge et retour en arrière, comme avant).
