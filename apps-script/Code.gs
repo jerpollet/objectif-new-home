@@ -1,5 +1,5 @@
 /**
- * Objectif New Home : API du tableau de suivi (V3.7).
+ * Objectif New Home : API du tableau de suivi (V3.9).
  * Script lié au tableau (SpreadsheetApp.getActive), publié en application web.
  *
  *  GET  <url>?cle=XXX  -> annonces non masquées (avec leur note) + journal + rapport + réglages + personnes + horodatage (JSON)
@@ -13,7 +13,7 @@
  *  Chaque changement de statut ajoute une ligne automatique (sans prénom) à l'onglet Journal, créé au besoin.
  *  Un commentaire peut être signé : « par » (prénom) est facultatif. Le journal ne se modifie pas depuis le site.
  *    {"cle":"XXX","action":"verifierLiens","liens":["https://…","texte collé…"]}
- *    {"cle":"XXX","action":"ajouter","liens":["https://…"]}
+ *    {"cle":"XXX","action":"ajouter","liens":["https://…"],"infos":{"https://…":"420 000 €, 130 m², commune"}}   (infos facultatif → Commentaire)
  *  verifierLiens : état par lien (A_TRAITER, DOUBLON, IGNOREE, EN_ATTENTE, DEJA_ANALYSEE, LIEN_SUIVI, INVALIDE).
  *  ajouter : écrit A_TRAITER et les DEJA_ANALYSEE renvoyables (résultat autre que « Ajoutée… »), en nouvelles lignes.
  *
@@ -131,7 +131,7 @@ function doPost(e) {
     }
     verrou.waitLock(15000);
     verrouille = true;
-    if (action === 'ajouter') return json_(Object.assign({ ok: true }, ajouter_(corps.liens)));
+    if (action === 'ajouter') return json_(Object.assign({ ok: true }, ajouter_(corps.liens, corps.infos)));
     if (action === 'note') return json_({ ok: true, annonce: ecrireNote_(corps) });
     if (action === 'journal') return json_({ ok: true, entree: ajouterAuJournal_(corps) });
     return json_(Object.assign({ ok: true }, changerStatut_(action, corps)));
@@ -543,7 +543,9 @@ function detailAnnonce_(a) {
   return d;
 }
 
-function ajouter_(liens) {
+/* infos (facultatif) : { <lien tel qu'envoyé>: texte } saisi sur le site pour un site illisible (prix, surface, commune) ;
+ * écrit dans « Commentaire » (300 caractères au plus). « Ajouté par » reste vide. */
+function ajouter_(liens, infos) {
   // Refaire la vérification sous verrou : un autre appareil a pu envoyer le même lien entre-temps.
   const ajouts = lireAjouts_();
   const resultats = verifierLiens_(liens, lireAnnonces_(), ajouts);
@@ -560,6 +562,8 @@ function ajouter_(liens) {
       const l = new Array(largeur).fill('');
       l[idx.lien] = texteSur_(r.direct || r.entree, 1000);
       l[idx.ajouteLe] = maintenant;
+      const info = infos && typeof infos === 'object' ? texteSur_(String(infos[r.entree] || '').trim(), 300) : '';
+      if (info && idx.commentaire !== undefined) l[idx.commentaire] = info;
       return l;
     });
     const debut = f.getLastRow() + 1;

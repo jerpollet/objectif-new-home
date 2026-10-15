@@ -921,3 +921,64 @@ body.sans-onglets .message{bottom:calc(84px + env(safe-area-inset-bottom, 0px))}
   .cellule-autres b{font-size:32px}
   .cellule-autres .cp-txt{margin-left:0;text-align:left}
 }
+
+/* ---------- Nouveautés (V3.9) : lignes compactes, groupées par jour ---------- */
+.ligne-nv{display:flex;align-items:flex-start;gap:12px;padding:12px 6px 12px 12px;border-bottom:1px solid var(--ligne);cursor:pointer;min-height:88px}
+.ligne-nv:last-child{border-bottom:0}
+.nv-vignette{position:relative;flex:none;width:76px;height:76px}
+.nv-vignette .img{width:100%;height:100%;border-radius:10px}
+.nv-vignette .repli .ico{width:22px;height:22px}
+.nv-vignette .repli span{display:none}
+.point-nv{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--accent);flex:none}
+.nv-vignette .point-nv{position:absolute;top:-3px;left:-3px;width:12px;height:12px;box-shadow:0 0 0 2px var(--surface)}
+.nv-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.nv-haut{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.nv-haut .drapeau{font-size:11px;padding:2px 8px}
+.nv-lieu{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nv-lieu b{font-weight:700}
+.nv-crit{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--gris)}
+.nv-crit > span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nv-marques{display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin-top:2px}
+.nv-marques .tag{box-shadow:none;padding:2px 8px}
+.tag-ajout{background:var(--creux);color:var(--encre)}
+.tag-ecart{background:var(--plafond-fond);color:var(--plafond-texte)}
+.nv-actions{display:flex;flex-direction:column;align-items:center;margin:-6px 0}
+.nv-intro{display:flex;flex-direction:column;gap:4px;padding:8px var(--gouttiere) 0;font-size:13px}
+.nv-depuis{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:700;color:var(--accent-600)}
+.nv-jour .lignes-nv{margin-top:10px}
+.sec-nouveautes .lignes-nv{margin-top:0}
+.sec-nouveautes .nv-tout{width:auto;margin:0 var(--gouttiere)}
+.sec-nouveautes .sec-tete .nv-depuis{font-size:12px}
+.menu-entree .pilule-nv{background:var(--accent);color:var(--accent-texte)}
+
+/* Ajouter : infos d'un lien Leboncoin ou Bien'ici. */
+.res-infos{display:flex;flex-direction:column;gap:4px;margin-top:8px}
+.res-infos label{font-size:12px;color:var(--gris)}
+.res-infos-champ{width:100%;min-height:40px;padding:8px 10px;border:1px solid var(--ligne-forte);border-radius:10px;background:var(--surface);font:inherit;font-size:16px;color:var(--encre)}
+.res-infos-champ:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
+
+@media (min-width:1024px){
+  .nouveautes{max-width:880px}
+  .nv-intro{padding:10px 28px 0}
+  .lignes-nv .ligne-nv{padding:14px 12px 14px 16px}
+  .sec-nouveautes .lignes-nv{margin:0;display:grid;grid-template-columns:repeat(3, minmax(0,1fr))}
+  .sec-nouveautes .ligne-nv{border-bottom:0;border-right:1px solid var(--ligne)}
+  .sec-nouveautes .ligne-nv:last-child{border-right:0}
+  .sec-nouveautes .nv-tout{margin:14px 0 0}
+  .res-infos-champ{font-size:14px}
+}
+
+/* En-tête ordinateur resserré (V3.9) : sous 1536 px, Nouveautés et Corbeille en icône + nombre et « + Ajouter » court ;
+   sous 1280 px, tous les liens de droite en icône + nombre. Le libellé reste en info-bulle et pour les lecteurs d'écran. */
+@media (min-width:1024px){
+  .eb-lien > .ico{display:none;width:18px;height:18px}
+}
+@media (min-width:1024px) and (max-width:1535px){
+  .eb-lien.eb-court > .ico{display:block}
+  .eb-lien.eb-court > .eb-lib{display:none}
+  .eb-suite{display:none}
+}
+@media (min-width:1024px) and (max-width:1279px){
+  .eb-lien > .ico{display:block}
+  .eb-lien > .eb-lib{display:none}
+}

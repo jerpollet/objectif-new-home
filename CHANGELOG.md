@@ -1,5 +1,15 @@
 # Changelog
 
+## V3.9 (Nouveautés, infos des liens illisibles)
+- Nouvelle page « Nouveautés » (`#nouveautes`) : toutes les annonces New (repérées ou ajoutées depuis moins de 7 jours), toutes Prio et Autres comprises, hors corbeille. Les plus récentes d'abord, groupées par jour (« Aujourd'hui », « Hier », « Lundi 12 octobre »). Lignes compactes : vignette, prix et drapeau, lieu, critères et DPE, puis Prio, Pépite, « Notre ajout », « Hors critères », Coup de cœur ; œil et cœur cliquables. Filtres Toutes · Nos ajouts · Pépites (mémorisés) et « Masquer les suivis » (le même que dans les Prio). La fiche ouverte depuis cette page navigue dans sa liste.
+- Repère « pas encore vue » (point rouge), propre à chaque appareil : une nouveauté compte comme vue quand on ouvre la page Nouveautés ou sa fiche. Repère par n° (un ajout porte la date de son envoi, souvent avant son arrivée dans le tableau). Au premier passage, tout ce qui est New compte comme vu.
+- Accès : menu burger juste sous Accueil (nombre + pastille « +N » pas encore vues) ; en-tête ordinateur avant Favoris.
+- Accueil : « Pépites du moment » ne montre plus que les pépites encore New (les favorites sont dans Favoris). Nouveau bloc « Nouveautés · N » sous les pépites : les 3 plus récentes et « Voir les N nouveautés ».
+- Ajouter : un lien Leboncoin ou Bien'ici coché affiche un champ facultatif « prix, surface, commune » (300 caractères), envoyé avec le lien et écrit dans la colonne « Commentaire » de l'onglet Ajouts, pour que la veille puisse ajouter l'annonce sans lire la page. Un partage reçu d'une appli avec un seul lien de ces sites pré-remplit ce champ avec le texte qui accompagnait le lien. Confirmation : « Envoyée avec vos infos ».
+- API (`apps-script/Code.gs`, à recopier et redéployer) : l'action `ajouter` accepte `infos` ({lien: texte}) et l'écrit dans « Commentaire ». Sans redéploiement, le site fonctionne mais les infos sont ignorées.
+- En-tête ordinateur : il débordait déjà de 30 à 40 px entre 1024 et 1439 px. Sous 1536 px, Nouveautés et Corbeille passent en icône + nombre et le bouton devient « + Ajouter » ; sous 1280 px, tous les liens de droite passent en icône + nombre (libellé en info-bulle et pour les lecteurs d'écran).
+- Service worker : cache `onh-v3-9`.
+
 ## V3.8.2 (raccourci vers l'annonce)
 - Cartes des Prio : icône « lien externe » en bas à droite, qui ouvre l'annonce dans un nouvel onglet (sans ouvrir la fiche) ; « Suivre / Suivi » se décale à sa gauche. Pas d'icône si l'annonce n'a pas de lien.
 - Correctif : l'icône œil barré du filtre « Masquer les annonces suivies » avait disparu depuis la V3.7.2 (puce vide) ; elle est rétablie.
