@@ -982,3 +982,21 @@ body.sans-onglets .message{bottom:calc(84px + env(safe-area-inset-bottom, 0px))}
   .eb-lien > .ico{display:block}
   .eb-lien > .eb-lib{display:none}
 }
+
+/* Corriger les infos (V3.10) : bouton dans l'en-tête de la Note, formulaire en feuille / fenêtre. */
+.note-tete{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.note-tete > .surtitre-sec{display:flex;align-items:center;gap:6px;font-size:16px;font-weight:800}
+.btn-corriger{gap:6px}
+.corr-grille{display:grid;grid-template-columns:repeat(2, minmax(0,1fr));gap:4px 12px}
+.corr-champ{display:flex;flex-direction:column;gap:4px;min-width:0}
+.corr-large{grid-column:1 / -1}
+.corr-input{width:100%;min-height:44px;padding:8px 12px;border:1.5px solid var(--ligne-forte);border-radius:12px;background:var(--surface);font:inherit;font-size:16px;color:var(--encre)}
+.corr-input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-100)}
+.corr-choix{align-self:flex-start;max-width:100%;overflow-x:auto;scrollbar-width:none}
+.corr-choix::-webkit-scrollbar{display:none}
+.corr-dpe button{min-width:34px;padding:0 4px;font-weight:800}
+.dlg-erreur{font-size:13px;font-weight:700;color:var(--max-texte);min-height:1em}
+.dlg-erreur:empty{display:none}
+@media (min-width:1024px){
+  .corr-input{font-size:15px}
+}

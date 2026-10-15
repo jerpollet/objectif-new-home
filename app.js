@@ -26,7 +26,20 @@
   ];
   var CHAMPS_STATUT = ["aimeePar", "enContact", "enContactDepuis", "corbeille", "corbeilleLe", "statutLe", "raisonCorbeille"];
   /* Champs gardés en local pendant une écriture en cours (mise à jour optimiste). */
-  var CHAMPS_LOCAUX = CHAMPS_STATUT.concat(["notes"]);
+  /* Infos corrigeables à la main depuis la fiche (action « corriger », mêmes bornes que CORRIGEABLES dans Code.gs). */
+  var CORRIGEABLES = [
+    {k:"prix", lib:"Prix", unite:"€", min:1000, max:20000000},
+    {k:"surface", lib:"Surface", unite:"m²", min:1, max:5000},
+    {k:"terrain", lib:"Terrain", unite:"m²", min:0, max:1000000},
+    {k:"pieces", lib:"Pièces", unite:"", min:1, max:50},
+    {k:"chambres", lib:"Chambres", unite:"", min:0, max:30},
+    {k:"commune", lib:"Commune", texte:true},
+    {k:"quartier", lib:"Quartier", texte:true},
+    {k:"dpe", lib:"DPE"},
+    {k:"garage", lib:"Garage"}
+  ];
+  var CHAMPS_CORRIGES = CORRIGEABLES.map(function(c){ return c.k; });
+  var CHAMPS_LOCAUX = CHAMPS_STATUT.concat(["notes"], CHAMPS_CORRIGES);
   var API_TEST = /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/;
 
   /* ---------- Outils ---------- */
@@ -492,6 +505,16 @@
           if (txt(c.texte)) a.notes = txt(c.texte); else delete a.notes;
           return test.attendre({ok:true, annonce:test.pourSite(a)});
         }
+        if (c.action === "corriger"){
+          var ch = [];
+          Object.keys(c.champs || {}).forEach(function(k){
+            var av = a[k] === undefined ? null : a[k], ap = c.champs[k];
+            if (av === ap) return;
+            if (ap === null) delete a[k]; else a[k] = ap;
+            ch.push(k + " : " + (av === null ? "vide" : av) + " → " + (ap === null ? "vide" : ap));
+          });
+          return test.attendre({ok:true, annonce:test.pourSite(a), journal:ch.length ? [test.copie(journaliser("Correction", "Corrigé · " + ch.join(" · ")))] : []});
+        }
         if (c.action === "journal"){
           if (!txt(c.texte)) return test.attendre().then(function(){ throw erreur("Commentaire vide."); });
           return test.attendre({ok:true, entree:test.copie(journaliser("Commentaire", txt(c.texte)))});
@@ -724,7 +747,12 @@
     /* Au clavier (ordinateur), le champ est prêt ; sur téléphone, pas de clavier qui surgit sans demande. */
     if (S.bureau) setTimeout(function(){ var z = document.querySelector(".dialogue textarea"); if (z) z.focus(); }, 30);
   }
-  function fermerDialogue(){ if (!S.dialogue) return; S.dialogue = null; rendre(true); }
+  function fermerDialogue(){
+    if (!S.dialogue) return;
+    /* Corriger : fermer sans enregistrer abandonne la saisie. */
+    if (S.dialogue.type === "corriger") delete S.brouillons["corr-" + S.dialogue.num];
+    S.dialogue = null; rendre(true);
+  }
 
   /* Prénom facultatif des commentaires du journal : le dernier utilisé est proposé sur cet appareil. */
   function prenom(){ var b = S.brouillons.prenom; return txt(b !== undefined ? b : lsGet(LS_PRENOM)).slice(0, 30); }
@@ -862,6 +890,115 @@
       });
     });
   }
+  /* ---------- Corriger les infos (prix, surface…) ---------- */
+  /* Brouillon du formulaire : textes tels que saisis. Valeur affichée au départ = celle du tableau. */
+  function cleCorr(a){ return "corr-" + a.num; }
+  function valeurChamp(a, c){
+    var v = a[c.k];
+    if (c.k === "garage") return v === true ? "oui" : v === false ? "non" : "";
+    if (c.k === "dpe") return dpe(a) || "";
+    if (c.texte) return txt(v);
+    return estNb(v) ? nb(v) : "";
+  }
+  function brouillonCorr(a){
+    var k = cleCorr(a);
+    if (!S.brouillons[k]){ var b = {}; CORRIGEABLES.forEach(function(c){ b[c.k] = valeurChamp(a, c); }); S.brouillons[k] = b; }
+    return S.brouillons[k];
+  }
+  /* Texte saisi → valeur à envoyer (null = vider), ou {erreur}. */
+  function lireChamp(c, t){
+    t = txt(t);
+    if (!t) return null;
+    if (c.k === "garage") return t === "oui";
+    if (c.k === "dpe") return t.toUpperCase();
+    if (c.texte) return t.slice(0, 80);
+    var n = Number(t.replace(/[\s\u00a0\u202f€m²]/g, "").replace(",", "."));
+    if (!isFinite(n) || n < c.min || n > c.max) return {erreur:c.lib + " : entre " + nb(c.min) + " et " + nb(c.max) + (c.unite ? " " + c.unite : "")};
+    return Math.round(n);
+  }
+  function valeurActuelle(a, k){
+    if (k === "garage") return a.garage === true ? true : a.garage === false ? false : null;
+    if (k === "dpe") return dpe(a);
+    if (k === "commune" || k === "quartier") return txt(a[k]) || null;
+    return estNb(a[k]) ? a[k] : null;
+  }
+  /* Champs qui changent vraiment, ou {erreur}. */
+  function changementsCorr(a){
+    var b = brouillonCorr(a), ch = {}, n = 0, err = null;
+    CORRIGEABLES.forEach(function(c){
+      if (err) return;
+      var v = lireChamp(c, b[c.k]);
+      if (v && typeof v === "object"){ err = v.erreur; return; }
+      if (v !== valeurActuelle(a, c.k)){ ch[c.k] = v; n++; }
+    });
+    return err ? {erreur:err} : {champs:ch, n:n};
+  }
+  function corrigerInfos(a, champs){
+    var num = a.num, avant = {};
+    CHAMPS_CORRIGES.forEach(function(k){ if (k in a) avant[k] = a[k]; });
+    Object.keys(champs).forEach(function(k){ if (champs[k] === null) delete a[k]; else a[k] = champs[k]; });
+    S.ops[num] = (S.ops[num] || 0) + 1;
+    S.opsAction[num] = "corriger";
+    rendre();
+    S.files[num] = (S.files[num] || Promise.resolve()).then(function(){
+      return ecrire({action:"corriger", num:num, champs:champs}).then(function(r){
+        S.ops[num]--; if (!S.ops[num]){ delete S.ops[num]; delete S.opsAction[num]; }
+        var b = trouver(num) || a;
+        if (r.annonce && r.annonce.num === num) CHAMPS_CORRIGES.forEach(function(k){ if (k in r.annonce) b[k] = r.annonce[k]; else delete b[k]; });
+        (Array.isArray(r.journal) ? r.journal : []).forEach(ajouterEntree);
+        ecrireCache();
+        message(champs.commune !== undefined || champs.quartier !== undefined ? "Infos corrigées · la Prio sera revue à la prochaine veille" : "Infos corrigées");
+        rendre();
+      }, function(e){
+        S.ops[num]--; if (!S.ops[num]){ delete S.ops[num]; delete S.opsAction[num]; }
+        if (e.cle){ cleInvalide(); return; }
+        var b = trouver(num) || a;
+        CHAMPS_CORRIGES.forEach(function(k){ if (k in avant) b[k] = avant[k]; else delete b[k]; });
+        rendre();
+        message("Pas corrigé : " + e.message, "erreur");
+      });
+    });
+  }
+  function formulaireCorr(a){
+    var b = brouillonCorr(a), k = cleCorr(a);
+    var erreur = el("p", {classe:"dlg-erreur", role:"alert"});
+    function champ(c){
+      var id = "corr-" + c.k;
+      if (c.k === "dpe" || c.k === "garage"){
+        var choix = c.k === "dpe" ? [["", "?"]].concat("ABCDEFG".split("").map(function(l){ return [l, l]; })) : [["", "Inconnu"], ["oui", "Oui"], ["non", "Non"]];
+        return el("div", {classe:"corr-champ corr-large"}, [
+          el("span", {classe:"dlg-label", id:id, texte:c.lib}),
+          el("div", {classe:"segmente corr-choix" + (c.k === "dpe" ? " corr-dpe" : ""), role:"group", "aria-labelledby":id}, choix.map(function(x){
+            return el("button", {type:"button", "aria-pressed":b[c.k] === x[0] ? "true" : "false",
+              "aria-label":c.lib + " : " + (x[0] ? x[1] : "inconnu"),
+              onclick:function(){ b[c.k] = x[0]; rendre(true); }}, [x[1]]);
+          }))
+        ]);
+      }
+      var input = el("input", {type:"text", id:id, classe:"corr-input", "data-saisie":k, autocomplete:"off", inputmode:c.texte ? null : "numeric",
+        enterkeyhint:"done", placeholder:c.texte ? "" : "?", maxlength:c.texte ? "80" : "12"});
+      input.value = b[c.k];
+      input.addEventListener("input", function(){ b[c.k] = input.value; erreur.textContent = ""; });
+      return el("div", {classe:"corr-champ" + (c.texte ? " corr-large" : "")}, [
+        el("label", {classe:"dlg-label", "for":id, texte:c.lib + (c.unite ? " (" + c.unite + ")" : "")}),
+        input
+      ]);
+    }
+    return {
+      corps:[
+        el("p", {classe:"dlg-aide", texte:"D'après l'annonce. Une case vide efface l'info. La veille garde vos corrections et revoit la Prio si la commune change."}),
+        el("div", {classe:"corr-grille"}, CORRIGEABLES.map(champ)),
+        erreur
+      ],
+      valider:function(){
+        var r = changementsCorr(a);
+        if (r.erreur){ erreur.textContent = r.erreur; return; }
+        delete S.brouillons[k]; S.dialogue = null;
+        if (!r.n){ rendre(true); message("Rien n'a changé"); return; }
+        corrigerInfos(a, r.champs);
+      }
+    };
+  }
   function blocNote(a){
     var k = cleNote(a), valeur = brouillonNote(a), modifiee = valeur.trim() !== txt(a.notes);
     var zone = el("textarea", {rows:"3", maxlength:String(MAX_NOTE), "data-saisie":k, "aria-label":"Note sur l'annonce n°" + a.num,
@@ -877,7 +1014,11 @@
     });
     zone.addEventListener("blur", function(){ if (zone.value.trim() !== txt(a.notes)) enregistrerNote(a, zone.value); });
     return el("section", {classe:"fiche-sec fiche-note"}, [
-      el("h3", {classe:"surtitre-sec"}, [ico("crayon"), " Note"]),
+      el("div", {classe:"note-tete"}, [
+        el("h3", {classe:"surtitre-sec"}, [ico("crayon"), " Note"]),
+        el("button", {type:"button", classe:"btn btn-contour btn-petit btn-corriger", onclick:function(){ ouvrirDialogue({type:"corriger", num:a.num}); }},
+          [enCours(a, "corriger") ? roue() : null, el("span", {texte:"Corriger les infos"})])
+      ]),
       zone,
       el("div", {classe:"note-bas"}, [
         etat,
@@ -906,7 +1047,7 @@
     var j = jour(d) === jour(auj) ? "aujourd'hui" : jour(d) === jour(hier) ? "hier" : jourCourt(iso);
     return j + " · " + heure(iso);
   }
-  var ICONES_JOURNAL = {Favori:"heart", Contact:"suivie", Corbeille:"trash", Restauration:"retour", Commentaire:"message"};
+  var ICONES_JOURNAL = {Favori:"heart", Contact:"suivie", Corbeille:"trash", Restauration:"retour", Commentaire:"message", Correction:"crayon"};
   function icoEntree(e){ return ico(e.type === "Corbeille" && /^Restaurée/.test(txt(e.texte)) ? "retour" : (ICONES_JOURNAL[e.type] || "historique")); }
   function envoyerCommentaire(a, zone){
     var k = "journal-" + a.num, texte = txt(zone ? zone.value : S.brouillons[k]).slice(0, MAX_NOTE);
@@ -2344,6 +2485,13 @@
           if (raison !== brut.slice(0, MAX_RAISON)) message("« Veille : » est réservé à la veille : retiré de la raison");
         }}, [ico("trash"), el("span", {texte:"Mettre à la corbeille"})])
       ];
+    } else if (d.type === "corriger"){
+      var f = formulaireCorr(a);
+      corps = [el("p", {classe:"dlg-resume", texte:resume})].concat(f.corps);
+      pied = [
+        el("button", {type:"button", classe:"btn btn-contour", onclick:function(){ delete S.brouillons[cleCorr(a)]; fermerDialogue(); }}, ["Annuler"]),
+        el("button", {type:"button", classe:"btn btn-accent", onclick:f.valider}, [ico("check"), el("span", {texte:"Enregistrer"})])
+      ];
     } else {
       corps = [
         el("p", {classe:"dlg-resume", texte:resume}),
@@ -2354,7 +2502,7 @@
         el("button", {type:"button", classe:"btn btn-danger", onclick:function(){ S.dialogue = null; delete S.brouillons[cleNote(a)]; enregistrerNote(a, ""); rendre(true); }}, ["Vider la note"])
       ];
     }
-    var titre = d.type === "corbeille" ? "Mettre à la corbeille ?" : "Vider la note ?";
+    var titre = d.type === "corbeille" ? "Mettre à la corbeille ?" : d.type === "corriger" ? "Corriger les infos" : "Vider la note ?";
     return el("div", {classe:"couche couche-dialogue"}, [
       el("div", {classe:"voile", onclick:fermerDialogue}),
       el("div", {classe:"feuille dialogue", role:"alertdialog", "aria-modal":"true", "aria-label":titre}, [

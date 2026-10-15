@@ -1,5 +1,5 @@
 /**
- * Objectif New Home : API du tableau de suivi (V3.9).
+ * Objectif New Home : API du tableau de suivi (V3.10).
  * Script lié au tableau (SpreadsheetApp.getActive), publié en application web.
  *
  *  GET  <url>?cle=XXX  -> annonces non masquées (avec leur note) + journal + rapport + réglages + personnes + horodatage (JSON)
@@ -10,6 +10,7 @@
  *    {"cle":"XXX","action":"restaurer","num":5}
  *    {"cle":"XXX","action":"note","num":5,"texte":"…"}            (texte vide : note vidée)
  *    {"cle":"XXX","action":"journal","num":5,"texte":"…","par":"Prénom"}
+ *    {"cle":"XXX","action":"corriger","num":5,"champs":{"prix":420000,"commune":"…","garage":true,"dpe":null}}   (voir CORRIGEABLES)
  *  Chaque changement de statut ajoute une ligne automatique (sans prénom) à l'onglet Journal, créé au besoin.
  *  Un commentaire peut être signé : « par » (prénom) est facultatif. Le journal ne se modifie pas depuis le site.
  *    {"cle":"XXX","action":"verifierLiens","liens":["https://…","texte collé…"]}
@@ -22,7 +23,8 @@
  * Favoris : une colonne « Favori <Prénom> » par personne, repérée par son en-tête (aucun prénom dans ce code).
  * L'API renvoie personnes = [{id:"p1", nom:"<Prénom>"}, …] dans l'ordre des colonnes, et aimeePar = ["p1", …] par annonce.
  * Le site n'écrit que les colonnes « Favori <Prénom> », En contact, En contact depuis, Corbeille, Corbeille le,
- * Statut changé le, Raison corbeille (vidée à la restauration) et Notes, des lignes dans Ajouts et dans Journal.
+ * Statut changé le, Raison corbeille (vidée à la restauration) et Notes, des lignes dans Ajouts et dans Journal,
+ * et, par l'action « corriger », les infos de CORRIGEABLES (prix, surface, terrain, pièces, chambres, commune, quartier, DPE, garage).
  */
 
 const ONGLET_ANNONCES = 'Annonces';
@@ -92,6 +94,24 @@ const CHAMPS_SITE = [
 // Les seules colonnes d'Annonces que le site a le droit d'écrire.
 const ECRITES_PAR_LE_SITE = ['enContact', 'enContactDepuis', 'corbeille', 'corbeilleLe', 'statutLe', 'raisonCorbeille', 'notes'];
 
+// Infos qu'on peut corriger à la main depuis la fiche (action « corriger »), avec leurs bornes.
+// La veille les respecte ensuite (lignes de Journal de Type « Correction ») et reclasse la Prio elle-même.
+const CORRIGEABLES = {
+  prix: { type: 'nombre', min: 1000, max: 20000000, unite: ' €' },
+  surface: { type: 'nombre', min: 1, max: 5000, unite: ' m²' },
+  terrain: { type: 'nombre', min: 0, max: 1000000, unite: ' m²' },
+  pieces: { type: 'nombre', min: 1, max: 50, unite: '' },
+  chambres: { type: 'nombre', min: 0, max: 30, unite: '' },
+  commune: { type: 'texte', max: 80 },
+  quartier: { type: 'texte', max: 80 },
+  dpe: { type: 'dpe' },
+  garage: { type: 'ouinon' },
+};
+const LIBELLES_CORRECTION = {
+  prix: 'Prix', surface: 'Surface', terrain: 'Terrain', pieces: 'Pièces', chambres: 'Chambres',
+  commune: 'Commune', quartier: 'Quartier', dpe: 'DPE', garage: 'Garage',
+};
+
 const AJOUTS = {
   lien: "Lien de l'annonce", par: 'Ajouté par', commentaire: 'Commentaire', ajouteLe: 'Ajouté le',
   traiteLe: 'Traité le', resultat: 'Résultat', num: 'N°',
@@ -126,7 +146,7 @@ function doPost(e) {
     if (action === 'verifierLiens') {
       return json_({ ok: true, resultats: verifierLiens_(corps.liens, lireAnnonces_(), lireAjouts_()) });
     }
-    if (['favori', 'contact', 'corbeille', 'restaurer', 'ajouter', 'note', 'journal'].indexOf(action) < 0) {
+    if (['favori', 'contact', 'corbeille', 'restaurer', 'ajouter', 'note', 'journal', 'corriger'].indexOf(action) < 0) {
       throw new Error('Action inconnue : ' + action);
     }
     verrou.waitLock(15000);
@@ -134,6 +154,7 @@ function doPost(e) {
     if (action === 'ajouter') return json_(Object.assign({ ok: true }, ajouter_(corps.liens, corps.infos)));
     if (action === 'note') return json_({ ok: true, annonce: ecrireNote_(corps) });
     if (action === 'journal') return json_({ ok: true, entree: ajouterAuJournal_(corps) });
+    if (action === 'corriger') return json_(Object.assign({ ok: true }, corriger_(corps)));
     return json_(Object.assign({ ok: true }, changerStatut_(action, corps)));
   } catch (err) {
     return json_({ ok: false, erreur: String(err.message || err) });
@@ -437,6 +458,68 @@ function ecrireNote_(corps) {
   const t = String(corps.texte === undefined || corps.texte === null ? '' : corps.texte).trim();
   L.f.getRange(L.ligne, L.idx.notes + 1).setValue(t ? texteSur_(t, MAX_NOTE) : '');
   return relireAnnonce_(L);
+}
+
+/* Correction à la main des infos d'une annonce (prix, surface…), depuis la fiche.
+ * corps.champs = { prix: 420000, commune: 'Talant', garage: true, dpe: null, … } ; null ou '' vide la cellule.
+ * Seules les valeurs qui changent sont écrites ; une ligne de Journal « Correction » les liste (avant → après).
+ * Renvoie { annonce, journal: [entrée] } ; journal vide si rien n'a changé. */
+function corriger_(corps) {
+  const champs = corps.champs;
+  if (!champs || typeof champs !== 'object' || Array.isArray(champs)) throw new Error('Champs à corriger manquants.');
+  const cles = Object.keys(champs);
+  if (!cles.length) throw new Error('Rien à corriger.');
+  cles.forEach(k => { if (!CORRIGEABLES[k]) throw new Error('Correction interdite : ' + k); });
+  const L = ligneAnnonce_(corps, cles);
+  const nouvelles = {};
+  cles.forEach(k => { nouvelles[k] = valeurCorrigee_(k, champs[k]); });
+
+  const changes = [];
+  cles.forEach(k => {
+    const avant = L.avant[k] === undefined ? null : L.avant[k];
+    const apres = nouvelles[k];
+    if (avant === apres) return;
+    const r = L.f.getRange(L.ligne, L.idx[k] + 1);
+    if (CORRIGEABLES[k].type === 'nombre') {
+      // Une cellule au format date afficherait le nombre en date (1740 devient 05/10/1904) : format nombre forcé.
+      if (apres !== null && /[dmy]/i.test(r.getNumberFormat()) && !/[#0]/.test(r.getNumberFormat())) r.setNumberFormat('0');
+      r.setValue(apres === null ? '' : apres);
+    } else if (CORRIGEABLES[k].type === 'ouinon') {
+      r.setValue(apres === true ? 'Oui' : apres === false ? 'Non' : '');
+    } else {
+      r.setValue(apres === null ? '' : texteSur_(apres, 80));
+    }
+    changes.push(LIBELLES_CORRECTION[k] + ' : ' + texteCorrection_(k, avant) + ' → ' + texteCorrection_(k, apres));
+  });
+  const journal = changes.length ? [journaliser_(L.num, 'Correction', 'Corrigé · ' + changes.join(' · '), '')] : [];
+  return { annonce: relireAnnonce_(L), journal: journal };
+}
+
+function valeurCorrigee_(k, v) {
+  const d = CORRIGEABLES[k];
+  if (v === null || v === undefined || String(v).trim() === '') return null;
+  if (d.type === 'nombre') {
+    const n = typeof v === 'number' ? v : Number(String(v).replace(/[\s\u00a0\u202f€m²]/g, '').replace(',', '.'));
+    if (!isFinite(n) || n < d.min || n > d.max) throw new Error(LIBELLES_CORRECTION[k] + ' invalide : ' + v);
+    return Math.round(n);
+  }
+  if (d.type === 'dpe') {
+    const l = String(v).trim().toUpperCase();
+    if (!/^[A-G]$/.test(l)) throw new Error('DPE invalide : ' + v + ' (A à G)');
+    return l;
+  }
+  if (d.type === 'ouinon') {
+    if (v === true || v === false) return v;
+    throw new Error('Garage invalide : ' + v);
+  }
+  return String(v).trim().slice(0, d.max);
+}
+
+function texteCorrection_(k, v) {
+  if (v === null || v === undefined || v === '') return 'vide';
+  if (CORRIGEABLES[k].type === 'ouinon') return v ? 'oui' : 'non';
+  if (CORRIGEABLES[k].type === 'nombre') return String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + CORRIGEABLES[k].unite;
+  return String(v);
 }
 
 /* Commentaire ajouté depuis le site. Le journal ne se modifie ni ne se supprime depuis le site. */

@@ -1,5 +1,12 @@
 # Changelog
 
+## V3.10 (corriger les infos d'une annonce)
+- Fiche : bouton « Corriger les infos » dans l'en-tête de la Note (annonces hors corbeille). Fenêtre (feuille du bas sur mobile) avec Prix, Surface, Terrain, Pièces, Chambres, Commune, Quartier, DPE (? ou A à G) et Garage (Inconnu, Oui, Non), pré-remplis avec les valeurs du tableau. Une case vidée efface l'info. Seules les valeurs qui changent sont envoyées ; bornes contrôlées (ex. prix de 1 000 à 20 000 000 €). Fermer sans enregistrer abandonne la saisie.
+- Écriture directe dans le tableau, optimiste comme les statuts (roue sur le bouton, retour en arrière et message rouge en cas d'échec). Message « Infos corrigées », complété par « la Prio sera revue à la prochaine veille » quand la commune ou le quartier change : le site ne connaît pas les secteurs, la Prio reste celle du tableau jusqu'à la veille.
+- Journal : une ligne Type « Correction », texte « Corrigé · Prix : 400 000 € → 420 000 € · Garage : vide → oui ». La veille s'en sert pour ne pas écraser vos corrections.
+- API (`apps-script/Code.gs`, à recopier et redéployer) : action `corriger` ({num, champs}), limitée aux colonnes de `CORRIGEABLES` ; une cellule de montant au format date repasse au format nombre.
+- Service worker : cache `onh-v3-10`.
+
 ## V3.9 (Nouveautés, infos des liens illisibles)
 - Nouvelle page « Nouveautés » (`#nouveautes`) : toutes les annonces New (repérées ou ajoutées depuis moins de 7 jours), toutes Prio et Autres comprises, hors corbeille. Les plus récentes d'abord, groupées par jour (« Aujourd'hui », « Hier », « Lundi 12 octobre »). Lignes compactes : vignette, prix et drapeau, lieu, critères et DPE, puis Prio, Pépite, « Notre ajout », « Hors critères », Coup de cœur ; œil et cœur cliquables. Filtres Toutes · Nos ajouts · Pépites (mémorisés) et « Masquer les suivis » (le même que dans les Prio). La fiche ouverte depuis cette page navigue dans sa liste.
 - Repère « pas encore vue » (point rouge), propre à chaque appareil : une nouveauté compte comme vue quand on ouvre la page Nouveautés ou sa fiche. Repère par n° (un ajout porte la date de son envoi, souvent avant son arrivée dans le tableau). Au premier passage, tout ce qui est New compte comme vu.
