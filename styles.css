@@ -53,6 +53,14 @@ a{color:inherit}
 .burger.ouvert{background:var(--encre);color:#fff}
 .entete-retour{gap:4px;padding-left:6px}
 .entete-retour h1{font-size:19px;font-weight:800;letter-spacing:-.01em}
+/* En-tête mobile en sombre (l'en-tête ordinateur reste clair). */
+.entete:not(.entete-bureau){background:var(--encre);color:#fff;border-bottom-color:var(--encre);-webkit-backdrop-filter:none;backdrop-filter:none}
+.entete:not(.entete-bureau) .surtitre{color:rgba(255,255,255,.62)}
+.entete:not(.entete-bureau) .burger{background:rgba(255,255,255,.12);color:#fff}
+.entete:not(.entete-bureau) .burger.ouvert{background:#fff;color:var(--encre)}
+.entete:not(.entete-bureau) .btn-ico{color:#fff}
+.entete:not(.entete-bureau) .btn-ico:hover{background:rgba(255,255,255,.12)}
+.entete:not(.entete-bureau) :focus-visible{outline-color:#fff}
 .btn-ico{width:44px;height:44px;display:grid;place-items:center;flex:none;border-radius:var(--r-btn)}
 .barre-charge{position:sticky;top:var(--entete-h);z-index:29;height:3px;background:var(--accent-100);overflow:hidden;margin-top:-3px}
 .barre-charge i{position:absolute;top:0;left:0;height:100%;width:38%;background:var(--accent);border-radius:3px;animation:defile 1.4s ease-in-out infinite}
