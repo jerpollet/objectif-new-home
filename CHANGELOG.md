@@ -1,10 +1,5 @@
 # Changelog
 
-## V3.10.1 (en-tête mobile sombre)
-- En-tête mobile sur fond sombre (`--encre`) : titre en blanc, surtitre en blanc atténué, bouton menu sur fond translucide (blanc quand le menu est ouvert), même rendu sur la page Ajouter. L'en-tête ordinateur ne change pas.
-- Barre d'état assortie : `theme-color` sombre sous 1024 px (blanc au-delà), `apple-mobile-web-app-status-bar-style` à `black`, `theme_color` du manifeste sombre (Android).
-- Service worker : cache `onh-v3-10-1`.
-
 ## V3.10 (corriger les infos d'une annonce)
 - Fiche : bouton « Corriger les infos » dans l'en-tête de la Note (annonces hors corbeille). Fenêtre (feuille du bas sur mobile) avec Prix, Surface, Terrain, Pièces, Chambres, Commune, Quartier, DPE (? ou A à G) et Garage (Inconnu, Oui, Non), pré-remplis avec les valeurs du tableau. Une case vidée efface l'info. Seules les valeurs qui changent sont envoyées ; bornes contrôlées (ex. prix de 1 000 à 20 000 000 €). Fermer sans enregistrer abandonne la saisie.
 - Écriture directe dans le tableau, optimiste comme les statuts (roue sur le bouton, retour en arrière et message rouge en cas d'échec). Message « Infos corrigées », complété par « la Prio sera revue à la prochaine veille » quand la commune ou le quartier change : le site ne connaît pas les secteurs, la Prio reste celle du tableau jusqu'à la veille.
